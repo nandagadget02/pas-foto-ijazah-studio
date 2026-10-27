@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Remix Remix Remix Remix Remix Remix PAS FOTO IJAZAH STUDIO",
+  "description": "Studio analisis dan koreksi pas foto ijazah profesional non-generatif berstandar 600 DPI dengan rekomendasi parameter Gemini AI dan pemrosesan piksel presisi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

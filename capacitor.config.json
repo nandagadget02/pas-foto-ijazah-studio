@@ -1,0 +1,9 @@
+{
+  "appId": "com.sevenstudio.pasfotoijazah",
+  "appName": "PAS FOTO IJAZAH STUDIO",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
