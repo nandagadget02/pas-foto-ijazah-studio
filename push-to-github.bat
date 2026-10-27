@@ -15,6 +15,6 @@ echo.
 echo ========================================================
 echo   SELESAI!
 echo   Web GitHub Pages akan aktif di:
-echo   https://nanda0078.github.io/pas-foto-ijazah-studio/
+echo   https://nandagadget02.github.io/pas-foto-ijazah-studio/
 echo ========================================================
 pause
