@@ -73,9 +73,6 @@ import { DimensionAndCrop } from './components/DimensionAndCrop';
 import { ExportPanel } from './components/ExportPanel';
 import { PrinterCompensationPanel } from './components/PrinterCompensationPanel';
 import { ApiKeyModal } from './components/ApiKeyModal';
-import { PhotoRoomKeyModal } from './components/PhotoRoomKeyModal';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { PhotoRoomService } from './services/PhotoRoomService';
 import { AIRecommendationPresetModal } from './components/AIRecommendationPresetModal';
 import { AIRecommendationPreset } from './types/analysis';
 import { StudioNavigationStrip, StudioStepTab } from './components/StudioNavigationStrip';
@@ -151,58 +148,6 @@ export default function App() {
   const [bgSettings, setBgSettings] = useState<BackgroundSettings>(DEFAULT_BG_SETTINGS);
   const [detectedBgColor, setDetectedBgColor] = useState<string | undefined>(undefined);
   const [segmentationWarning, setSegmentationWarning] = useState<string | null>(null);
-  // PhotoRoom Cloud AI State
-  const [selectedBgEngine, setSelectedBgEngine] = useState<'local' | 'photoroom'>('local');
-  const [isPhotoRoomModalOpen, setIsPhotoRoomModalOpen] = useState<boolean>(false);
-  const [isProcessingPhotoRoom, setIsProcessingPhotoRoom] = useState<boolean>(false);
-  const [photoRoomError, setPhotoRoomError] = useState<string | null>(null);
-  const [isPhotoRoomMaskActive, setIsPhotoRoomMaskActive] = useState<boolean>(false);
-  const [photoRoomApiKey, setPhotoRoomApiKey] = useState<string>(() => PhotoRoomService.getApiKey());
-
-  // PhotoRoom Cloud AI Background Removal Handlers
-  const handleProcessWithPhotoRoom = useCallback(async () => {
-    if (!sourceImage) {
-      alert('Unggah foto sumber terlebih dahulu sebelum menjalankan PhotoRoom AI.');
-      return;
-    }
-    const key = PhotoRoomService.getApiKey();
-    if (!key) {
-      setIsPhotoRoomModalOpen(true);
-      return;
-    }
-
-    setIsProcessingPhotoRoom(true);
-    setPhotoRoomError(null);
-    try {
-      // Prioritaskan kanvas terpotong agar hemat token dan sesuai framing
-      const targetSource = rawCroppedCanvasRef.current || sourceImage;
-      const res = await PhotoRoomService.removeBackground(targetSource, key);
-      if (res.ok && res.mask) {
-        if (res.width && res.height) {
-          (res.mask as any).maskWidth = res.width;
-          (res.mask as any).maskHeight = res.height;
-        }
-        setCustomMask(res.mask);
-        setMaskVersion((v) => v + 1);
-        setIsPhotoRoomMaskActive(true);
-        setBgRemovalMode('remove');
-        previewCacheRef.current.clear();
-      } else {
-        setPhotoRoomError(res.error || 'Gagal memproses gambar dengan PhotoRoom API.');
-      }
-    } catch (err: any) {
-      setPhotoRoomError(err?.message || 'Terjadi kesalahan saat memproses PhotoRoom API.');
-    } finally {
-      setIsProcessingPhotoRoom(false);
-    }
-  }, [sourceImage]);
-
-  const handleResetPhotoRoomMask = useCallback(() => {
-    setCustomMask(null);
-    setMaskVersion((v) => v + 1);
-    setIsPhotoRoomMaskActive(false);
-    previewCacheRef.current.clear();
-  }, []);
 
   // 6. Dimension & Crop State
   const [selectedDimension, setSelectedDimension] = useState<OutputDimension>(
@@ -2596,15 +2541,6 @@ export default function App() {
                     onResetMask={handleResetMask}
                     edgeInspectionFocus={edgeInspectionFocus}
                     onSelectEdgeInspectionFocus={setEdgeInspectionFocus}
-                    bgEngine={selectedBgEngine}
-                    onSelectBgEngine={setSelectedBgEngine}
-                    onOpenPhotoRoomModal={() => setIsPhotoRoomModalOpen(true)}
-                    onProcessWithPhotoRoom={handleProcessWithPhotoRoom}
-                    isProcessingPhotoRoom={isProcessingPhotoRoom}
-                    hasPhotoRoomKey={Boolean(photoRoomApiKey)}
-                    isPhotoRoomMaskActive={isPhotoRoomMaskActive}
-                    onResetPhotoRoomMask={handleResetPhotoRoomMask}
-                    photoRoomError={photoRoomError}
                   />
                 </div>
               </div>
@@ -2719,13 +2655,6 @@ export default function App() {
         selectedModel={selectedModel}
         onSave={handleSaveApiKey}
         onClear={handleClearApiKey}
-      />
-
-      {/* PhotoRoom AI API Key Modal */}
-      <PhotoRoomKeyModal
-        isOpen={isPhotoRoomModalOpen}
-        onClose={() => setIsPhotoRoomModalOpen(false)}
-        onKeySaved={(newKey) => setPhotoRoomApiKey(newKey)}
       />
 
       {/* AI & Local Recommendation Presets Modal (Save, Reuse, Export, Import) */}
