@@ -89,7 +89,8 @@ export class PhotoRoomService {
       let errorDetail = `HTTP ${response.status}`;
       try {
         const errJson = await response.json();
-        if (errJson?.message) errorDetail = errJson.message;
+        if (errJson?.detail) errorDetail = errJson.detail;
+        else if (errJson?.message) errorDetail = errJson.message;
         else if (errJson?.error) errorDetail = errJson.error;
       } catch (_) {}
 
@@ -159,7 +160,9 @@ export class PhotoRoomService {
         let errDesc = `HTTP ${response.status}`;
         try {
           const errData = await response.json();
-          if (errData?.message) errDesc = errData.message;
+          if (errData?.detail) errDesc = errData.detail;
+          else if (errData?.message) errDesc = errData.message;
+          else if (errData?.error) errDesc = errData.error;
         } catch (_) {}
 
         if (response.status === 401 || response.status === 403) {
@@ -203,6 +206,8 @@ export class PhotoRoomService {
         // Pixel format RGBA, alpha ada di indeks i * 4 + 3
         alphaArray[i] = imgData.data[i * 4 + 3] / 255.0;
       }
+      (alphaArray as any).maskWidth = width;
+      (alphaArray as any).maskHeight = height;
 
       const isSandbox = key.toLowerCase().startsWith('sandbox_');
 
@@ -215,9 +220,16 @@ export class PhotoRoomService {
         isSandbox,
       };
     } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        return {
+          ok: false,
+          error: 'Gagal terhubung ke PhotoRoom API (koneksi jaringan atau pembatasan CORS). Periksa koneksi internet Anda atau gunakan Mesin Studio Lokal.',
+        };
+      }
       return {
         ok: false,
-        error: err.message || 'Terjadi kesalahan saat memproses gambar dengan PhotoRoom API.',
+        error: msg || 'Terjadi kesalahan saat memproses gambar dengan PhotoRoom API.',
       };
     }
   }

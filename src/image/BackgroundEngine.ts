@@ -765,37 +765,57 @@ export class BackgroundEngine {
       }
     }
 
-    // 11. Terapkan Mask Manual Kustom Pengguna (jika tersedia dari kuas manual)
+        // 11. Terapkan Mask Manual Kustom Pengguna (jika tersedia dari kuas manual atau PhotoRoom AI)
     if (customMask) {
       if (customMask.length === width * height) {
         for (let i = 0; i < mask.length; i++) {
-          mask[i] = customMask[i];
+          const val = customMask[i];
+          mask[i] = (typeof val === 'number' && !isNaN(val)) ? Math.max(0, Math.min(1, val)) : mask[i];
         }
       } else {
-        const srcW = Math.round(Math.sqrt((customMask.length * width) / height));
-        const srcH = Math.round(customMask.length / srcW);
-        if (srcW > 0 && srcH > 0 && srcW * srcH === customMask.length) {
-          for (let y = 0; y < height; y++) {
-            const srcY = Math.min(srcH - 1, Math.max(0, (y / (height - 1)) * (srcH - 1)));
-            const y0 = Math.floor(srcY);
-            const y1 = Math.min(srcH - 1, y0 + 1);
-            const fy = srcY - y0;
+        const rawW = (customMask as any).maskWidth;
+        const rawH = (customMask as any).maskHeight;
+        let srcW = (rawW && rawH && rawW * rawH === customMask.length)
+          ? rawW
+          : Math.round(Math.sqrt((customMask.length * width) / Math.max(1, height)));
+        let srcH = (rawW && rawH && rawW * rawH === customMask.length)
+          ? rawH
+          : Math.round(customMask.length / Math.max(1, srcW));
 
-            for (let x = 0; x < width; x++) {
-              const srcX = Math.min(srcW - 1, Math.max(0, (x / (width - 1)) * (srcW - 1)));
-              const x0 = Math.floor(srcX);
-              const x1 = Math.min(srcW - 1, x0 + 1);
-              const fx = srcX - x0;
+        if (srcW <= 0 || srcH <= 0) {
+          srcW = width;
+          srcH = height;
+        }
 
-              const v00 = customMask[y0 * srcW + x0];
-              const v10 = customMask[y0 * srcW + x1];
-              const v01 = customMask[y1 * srcW + x0];
-              const v11 = customMask[y1 * srcW + x1];
+        const denomY = Math.max(1, height - 1);
+        const denomX = Math.max(1, width - 1);
 
-              const top = v00 * (1 - fx) + v10 * fx;
-              const btm = v01 * (1 - fx) + v11 * fx;
-              mask[y * width + x] = top * (1 - fy) + btm * fy;
-            }
+        for (let y = 0; y < height; y++) {
+          const srcY = Math.min(srcH - 1, Math.max(0, (y / denomY) * (srcH - 1)));
+          const y0 = Math.floor(srcY);
+          const y1 = Math.min(srcH - 1, y0 + 1);
+          const fy = srcY - y0;
+
+          for (let x = 0; x < width; x++) {
+            const srcX = Math.min(srcW - 1, Math.max(0, (x / denomX) * (srcW - 1)));
+            const x0 = Math.floor(srcX);
+            const x1 = Math.min(srcW - 1, x0 + 1);
+            const fx = srcX - x0;
+
+            const idx00 = y0 * srcW + x0;
+            const idx10 = y0 * srcW + x1;
+            const idx01 = y1 * srcW + x0;
+            const idx11 = y1 * srcW + x1;
+
+            const v00 = idx00 < customMask.length ? customMask[idx00] : 0;
+            const v10 = idx10 < customMask.length ? customMask[idx10] : 0;
+            const v01 = idx01 < customMask.length ? customMask[idx01] : 0;
+            const v11 = idx11 < customMask.length ? customMask[idx11] : 0;
+
+            const top = v00 * (1 - fx) + v10 * fx;
+            const btm = v01 * (1 - fx) + v11 * fx;
+            const finalVal = top * (1 - fy) + btm * fy;
+            mask[y * width + x] = (!isNaN(finalVal)) ? Math.max(0, Math.min(1, finalVal)) : 0;
           }
         }
       }

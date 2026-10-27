@@ -30,6 +30,7 @@ import {
   Redo2,
   ScanEye,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import {
   BackgroundType,
@@ -72,6 +73,16 @@ interface BackgroundSelectorProps {
   onResetMask?: () => void;
   edgeInspectionFocus?: 'fit' | 'hair' | 'ears' | 'collar' | 'shoulders';
   onSelectEdgeInspectionFocus?: (focus: 'fit' | 'hair' | 'ears' | 'collar' | 'shoulders') => void;
+  bgEngine?: 'local' | 'photoroom';
+  onSelectBgEngine?: (engine: 'local' | 'photoroom') => void;
+  onOpenPhotoRoomModal?: () => void;
+  onProcessWithPhotoRoom?: () => void;
+  isProcessingPhotoRoom?: boolean;
+  hasPhotoRoomKey?: boolean;
+  isPhotoRoomMaskActive?: boolean;
+  onResetPhotoRoomMask?: () => void;
+  photoRoomError?: string | null;
+
 }
 
 interface CustomBgLibraryItem {

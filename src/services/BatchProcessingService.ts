@@ -4,6 +4,7 @@ import {
   BackgroundSettings,
   BackgroundType,
   BackgroundRemovalMode,
+  DiagnosticPreviewMode,
   BatchPhotoItem,
   CropRect,
   DEFAULT_BG_SETTINGS,
@@ -207,6 +208,8 @@ export class BatchProcessingService {
     processedCanvas: HTMLCanvasElement;
     masterCanvas: HTMLCanvasElement;
     printCanvas: HTMLCanvasElement;
+    customMask?: Float32Array;
+    diagnosticMode?: DiagnosticPreviewMode;
   } {
     const targetDim = item.selectedDimension || options.selectedDimension;
     const framing = item.framingSettings || options.framingSettings || DEFAULT_FRAMING_SETTINGS;
@@ -346,6 +349,8 @@ export class BatchProcessingService {
       faceSharpenSettings?: FaceSharpenSettings;
       editTargetMode?: EditTargetMode;
       printerCompensation?: PrinterCompensationSettings;
+      bgRemovalMode?: BackgroundRemovalMode;
+      rotation?: number;
     }
   ): Promise<string> {
     const { photoMode, format, quality = 1.0, targetDimension, printerProfile } = options;

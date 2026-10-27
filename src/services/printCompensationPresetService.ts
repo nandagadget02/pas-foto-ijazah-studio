@@ -120,6 +120,10 @@ export class PrintCompensationPresetService {
         yellowBias: Math.max(-100, Math.min(100, Math.round(settings.yellowBias || 0))),
         redBias: Math.max(-100, Math.min(100, Math.round(settings.redBias || 0))),
         greenBias: Math.max(-100, Math.min(100, Math.round(settings.greenBias || 0))),
+        printBrightness: Math.max(-50, Math.min(50, Math.round(settings.printBrightness || 0))),
+        highlightRecovery: Math.max(0, Math.min(100, Math.round(settings.highlightRecovery || 0))),
+        whitePoint: Math.max(-50, Math.min(50, Math.round(settings.whitePoint || 0))),
+        whiteGarmentDetail: Math.max(0, Math.min(100, Math.round(settings.whiteGarmentDetail || 0))),
       },
     };
 
@@ -255,6 +259,10 @@ export class PrintCompensationPresetService {
         yellowBias: Math.max(-100, Math.min(100, Math.round(settings.yellowBias || 0))),
         redBias: Math.max(-100, Math.min(100, Math.round(settings.redBias || 0))),
         greenBias: Math.max(-100, Math.min(100, Math.round(settings.greenBias || 0))),
+        printBrightness: Math.max(-50, Math.min(50, Math.round(settings.printBrightness || 0))),
+        highlightRecovery: Math.max(0, Math.min(100, Math.round(settings.highlightRecovery || 0))),
+        whitePoint: Math.max(-50, Math.min(50, Math.round(settings.whitePoint || 0))),
+        whiteGarmentDetail: Math.max(0, Math.min(100, Math.round(settings.whiteGarmentDetail || 0))),
       },
     };
 

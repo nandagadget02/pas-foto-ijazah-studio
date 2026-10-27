@@ -74,6 +74,7 @@ import { ExportPanel } from './components/ExportPanel';
 import { PrinterCompensationPanel } from './components/PrinterCompensationPanel';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { PhotoRoomKeyModal } from './components/PhotoRoomKeyModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { PhotoRoomService } from './services/PhotoRoomService';
 import { AIRecommendationPresetModal } from './components/AIRecommendationPresetModal';
 import { AIRecommendationPreset } from './types/analysis';
@@ -177,6 +178,10 @@ export default function App() {
       const targetSource = rawCroppedCanvasRef.current || sourceImage;
       const res = await PhotoRoomService.removeBackground(targetSource, key);
       if (res.ok && res.mask) {
+        if (res.width && res.height) {
+          (res.mask as any).maskWidth = res.width;
+          (res.mask as any).maskHeight = res.height;
+        }
         setCustomMask(res.mask);
         setMaskVersion((v) => v + 1);
         setIsPhotoRoomMaskActive(true);
@@ -1671,7 +1676,7 @@ export default function App() {
 
   // Debounce timer & LRU preview cache for 60 FPS slider reactivity
   const previewTimerRef = useRef<any>(null);
-  const previewCacheRef = useRef<Map<string, { master: HTMLCanvasElement; print: HTMLCanvasElement; segResult?: any }>>(new Map());
+  const previewCacheRef = useRef<Map<string, { master: HTMLCanvasElement; print: HTMLCanvasElement; segResult?: any; mask?: Float32Array; rawCroppedCanvas?: HTMLCanvasElement }>>(new Map());
 
   // Process and re-render image preview whenever any parameter changes
   useEffect(() => {
