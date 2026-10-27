@@ -2591,6 +2591,15 @@ export default function App() {
                     onResetMask={handleResetMask}
                     edgeInspectionFocus={edgeInspectionFocus}
                     onSelectEdgeInspectionFocus={setEdgeInspectionFocus}
+                    bgEngine={selectedBgEngine}
+                    onSelectBgEngine={setSelectedBgEngine}
+                    onOpenPhotoRoomModal={() => setIsPhotoRoomModalOpen(true)}
+                    onProcessWithPhotoRoom={handleProcessWithPhotoRoom}
+                    isProcessingPhotoRoom={isProcessingPhotoRoom}
+                    hasPhotoRoomKey={Boolean(photoRoomApiKey)}
+                    isPhotoRoomMaskActive={isPhotoRoomMaskActive}
+                    onResetPhotoRoomMask={handleResetPhotoRoomMask}
+                    photoRoomError={photoRoomError}
                   />
                 </div>
               </div>

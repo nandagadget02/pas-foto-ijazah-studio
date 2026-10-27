@@ -114,6 +114,15 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   onResetMask,
   edgeInspectionFocus = 'fit',
   onSelectEdgeInspectionFocus,
+  bgEngine = 'local',
+  onSelectBgEngine,
+  onOpenPhotoRoomModal,
+  onProcessWithPhotoRoom,
+  isProcessingPhotoRoom = false,
+  hasPhotoRoomKey = false,
+  isPhotoRoomMaskActive = false,
+  onResetPhotoRoomMask,
+  photoRoomError = null,
 }) => {
   const customFileInputRef = useRef<HTMLInputElement>(null);
   const [stagedType, setStagedType] = useState<BackgroundType>(currentType);
