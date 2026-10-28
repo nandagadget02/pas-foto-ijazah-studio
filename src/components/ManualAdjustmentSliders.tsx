@@ -87,13 +87,15 @@ const SliderRow: React.FC<SliderRowProps> = ({
   defaultValue = 0,
   onChange,
 }) => {
+  const safeValue = typeof value === 'number' && !isNaN(value) ? value : defaultValue;
+
   const handleDecrement = () => {
-    const next = Math.max(min, Number((value - step).toFixed(2)));
+    const next = Math.max(min, Number((safeValue - step).toFixed(2)));
     onChange(next);
   };
 
   const handleIncrement = () => {
-    const next = Math.min(max, Number((value + step).toFixed(2)));
+    const next = Math.min(max, Number((safeValue + step).toFixed(2)));
     onChange(next);
   };
 
@@ -101,7 +103,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
     onChange(defaultValue);
   };
 
-  const isModified = Math.abs(value - defaultValue) > 0.001;
+  const isModified = Math.abs(safeValue - defaultValue) > 0.001;
 
   return (
     <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 hover:border-slate-700/80 transition-colors">
@@ -118,7 +120,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
                 : 'bg-slate-800 text-slate-400'
             }`}
           >
-            {value > 0 && unit !== '%' ? `+${value}` : value}
+            {safeValue > 0 && unit !== '%' ? `+${safeValue}` : safeValue}
             {unit}
           </span>
           {isModified && (
@@ -138,7 +140,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
         <button
           type="button"
           onClick={handleDecrement}
-          disabled={value <= min}
+          disabled={safeValue <= min}
           aria-label={`Kurangi ${label}`}
           className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-slate-700/60"
         >
@@ -150,15 +152,18 @@ const SliderRow: React.FC<SliderRowProps> = ({
           min={min}
           max={max}
           step={step}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
+          value={safeValue}
+          onChange={(e) => {
+            const parsed = parseFloat(e.target.value);
+            onChange(isNaN(parsed) ? defaultValue : parsed);
+          }}
           className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300 focus:outline-none"
         />
 
         <button
           type="button"
           onClick={handleIncrement}
-          disabled={value >= max}
+          disabled={safeValue >= max}
           aria-label={`Tambah ${label}`}
           className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-slate-700/60"
         >

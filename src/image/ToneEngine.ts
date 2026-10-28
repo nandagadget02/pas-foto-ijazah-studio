@@ -169,11 +169,12 @@ export class ToneEngine {
             }
             hue = hue * 60;
             if (hue < 0) hue += 360;
+            if (hue >= 360) hue -= 360;
 
             // Interpolate saturation adjustment based on hue
             // 0: Reds, 60: Yellows, 120: Greens, 180: Cyans, 240: Blues, 300: Magentas
             let deltaSat = 0;
-            const sector = Math.floor(hue / 60); // 0 to 5
+            const sector = Math.floor(hue / 60); // strictly 0 to 5
             const t = (hue % 60) / 60; // 0.0 to 1.0
             // Cosine blend for silky smooth transitions without color banding
             const w = (1 - Math.cos(t * Math.PI)) * 0.5;
@@ -211,18 +212,29 @@ export class ToneEngine {
               }
 
               const curLum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-              const selectiveFactor = 1 + deltaSat / 100;
-              r = curLum + selectiveFactor * (r - curLum);
-              g = curLum + selectiveFactor * (g - curLum);
-              b = curLum + selectiveFactor * (b - curLum);
+              const selectiveFactor = Math.max(0, 1 + deltaSat / 100);
+              const newR = curLum + selectiveFactor * (r - curLum);
+              const newG = curLum + selectiveFactor * (g - curLum);
+              const newB = curLum + selectiveFactor * (b - curLum);
 
-              // Gamut clipping protection (scale towards luminance to preserve hue integrity)
-              const newMax = Math.max(r, g, b);
-              if (newMax > 255) {
-                const damp = 255 / newMax;
-                r = curLum + (r - curLum) * damp;
-                g = curLum + (g - curLum) * damp;
-                b = curLum + (b - curLum) * damp;
+              // Gamut clipping protection: scale deviation from luminance to keep strictly within [0, 255]
+              // while rigorously preserving hue ratio and luminance
+              let scale = 1.0;
+              if (newR > 255 && newR > curLum) scale = Math.min(scale, (255 - curLum) / (newR - curLum));
+              if (newG > 255 && newG > curLum) scale = Math.min(scale, (255 - curLum) / (newG - curLum));
+              if (newB > 255 && newB > curLum) scale = Math.min(scale, (255 - curLum) / (newB - curLum));
+              if (newR < 0 && newR < curLum) scale = Math.min(scale, curLum / (curLum - newR));
+              if (newG < 0 && newG < curLum) scale = Math.min(scale, curLum / (curLum - newG));
+              if (newB < 0 && newB < curLum) scale = Math.min(scale, curLum / (curLum - newB));
+
+              if (scale < 1.0) {
+                r = curLum + scale * (newR - curLum);
+                g = curLum + scale * (newG - curLum);
+                b = curLum + scale * (newB - curLum);
+              } else {
+                r = newR;
+                g = newG;
+                b = newB;
               }
             }
           }

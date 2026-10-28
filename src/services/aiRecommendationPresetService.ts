@@ -177,7 +177,7 @@ export class AIRecommendationPresetService {
       eyeDetail: Math.round(this.clamp(p.eyeDetail, 0, 25, 12)),
       hairDetail: Math.round(this.clamp(p.hairDetail, 0, 25, 8)),
       skinProtection: Math.round(this.clamp(p.skinProtection, 0, 25, 12)),
-      saturation: 0,
+      saturation: Math.round(this.clamp(p.saturation, -50, 50, 0)),
       temperature: Math.round(this.clamp(p.temperature, -25, 25, 0)),
       tint: Math.round(this.clamp(p.tint, -25, 25, 0)),
       satRed: Math.round(this.clamp(p.satRed, -100, 100, 0)),

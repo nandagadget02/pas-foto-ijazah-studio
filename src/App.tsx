@@ -401,6 +401,12 @@ export default function App() {
       saturation: 0,
       temperature: recommendation.temperature,
       tint: recommendation.tint,
+      satRed: 0,
+      satYellow: 0,
+      satGreen: 0,
+      satCyan: 0,
+      satBlue: 0,
+      satMagenta: 0,
     };
 
     setAdjustments(newAdjustments);
@@ -879,6 +885,12 @@ export default function App() {
             saturation: 0,
             temperature: item.analysisResult.recommendation.temperature,
             tint: item.analysisResult.recommendation.tint,
+            satRed: 0,
+            satYellow: 0,
+            satGreen: 0,
+            satCyan: 0,
+            satBlue: 0,
+            satMagenta: 0,
           }
         : GeminiService.getInitialAdjustments();
 
@@ -1679,8 +1691,15 @@ export default function App() {
       adjustments.eyeDetail,
       adjustments.hairDetail,
       adjustments.skinProtection,
+      adjustments.saturation,
       adjustments.temperature,
       adjustments.tint,
+      adjustments.satRed ?? 0,
+      adjustments.satYellow ?? 0,
+      adjustments.satGreen ?? 0,
+      adjustments.satCyan ?? 0,
+      adjustments.satBlue ?? 0,
+      adjustments.satMagenta ?? 0,
       bgSettings.subjectScale,
       bgSettings.subjectRotation,
       bgSettings.subjectOffsetX,
