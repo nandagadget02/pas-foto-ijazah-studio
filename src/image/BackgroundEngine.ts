@@ -246,7 +246,18 @@ export class BackgroundEngine {
 
         const gx = (-p11 - 2 * p21 - p31 + p13 + 2 * p23 + p33) * 0.25;
         const gy = (-p11 - 2 * p12 - p13 + p31 + 2 * p32 + p33) * 0.25;
-        grad[rowOffset + x] = Math.sqrt(gx * gx + gy * gy);
+        const lumGrad = Math.sqrt(gx * gx + gy * gy);
+
+        // Detect color gradient (detects boundaries even when luminance is similar, e.g. blue on gray)
+        const drX = Math.abs(srcData[i23] - srcData[i21]);
+        const dgX = Math.abs(srcData[i23 + 1] - srcData[i21 + 1]);
+        const dbX = Math.abs(srcData[i23 + 2] - srcData[i21 + 2]);
+        const drY = Math.abs(srcData[i32] - srcData[i12]);
+        const dgY = Math.abs(srcData[i32 + 1] - srcData[i12 + 1]);
+        const dbY = Math.abs(srcData[i32 + 2] - srcData[i12 + 2]);
+        const colorGrad = (Math.max(drX, dgX, dbX) + Math.max(drY, dgY, dbY)) * 0.5;
+
+        grad[rowOffset + x] = Math.max(lumGrad, colorGrad);
       }
     }
     return grad;
@@ -275,9 +286,11 @@ export class BackgroundEngine {
     // 1. Evaluate original background confidence & color profile
     const safety = this.evaluateBackgroundConfidence(imageData);
 
-    // 2. Comprehensive multi-zone background sampling
+    // 2. Safe outer multi-zone background sampling
+    // Strictly sampling from the outermost borders to avoid touching hair or shoulders
     const bgSamples: [number, number, number][] = [];
-    const cornerSize = Math.max(3, Math.floor(width * 0.08));
+    const cornerSize = Math.max(3, Math.floor(width * 0.09));
+    const topStripH = Math.max(2, Math.floor(height * 0.05));
 
     // Top-left corner
     for (let y = 0; y < cornerSize; y++) {
@@ -293,23 +306,23 @@ export class BackgroundEngine {
         bgSamples.push([srcData[i], srcData[i + 1], srcData[i + 2]]);
       }
     }
-    // Top perimeter band (excluding center 34% hair crown)
-    for (let y = 0; y < Math.max(2, Math.floor(height * 0.04)); y++) {
-      for (let x = 0; x < width; x += 3) {
-        if (x > width * 0.33 && x < width * 0.67) continue;
+    // Top perimeter band (excluding center 36% hair crown)
+    for (let y = 0; y < topStripH; y++) {
+      for (let x = 0; x < width; x += 2) {
+        if (x > width * 0.32 && x < width * 0.68) continue;
         const i = (y * width + x) * 4;
         bgSamples.push([srcData[i], srcData[i + 1], srcData[i + 2]]);
       }
     }
-    // Upper-left & Upper-right side margins strictly above shoulder line (y < 35%)
-    const midUpperY = Math.floor(height * 0.35);
-    const edgeMargin = Math.max(2, Math.floor(width * 0.04));
-    for (let y = cornerSize; y < midUpperY; y += 3) {
-      for (let x = 0; x < edgeMargin; x += 2) {
+    // Upper-left & Upper-right side margins strictly above shoulder line (y < 26% height)
+    const midUpperY = Math.floor(height * 0.26);
+    const edgeMargin = Math.max(2, Math.floor(width * 0.035));
+    for (let y = cornerSize; y < midUpperY; y += 2) {
+      for (let x = 0; x < edgeMargin; x++) {
         const i = (y * width + x) * 4;
         bgSamples.push([srcData[i], srcData[i + 1], srcData[i + 2]]);
       }
-      for (let x = width - edgeMargin; x < width; x += 2) {
+      for (let x = width - edgeMargin; x < width; x++) {
         const i = (y * width + x) * 4;
         bgSamples.push([srcData[i], srcData[i + 1], srcData[i + 2]]);
       }
@@ -330,7 +343,6 @@ export class BackgroundEngine {
     const bgCr = bgR / bgSum;
     const bgCg = bgG / bgSum;
     const bgCb = bgB / bgSum;
-    const bgNorm = Math.sqrt(bgR * bgR + bgG * bgG + bgB * bgB) || 1;
     const bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
     const isLightBg = bgLum > 165;
     const isDarkBg = bgLum < 75;
@@ -366,15 +378,15 @@ export class BackgroundEngine {
       b: Math.round(skinBSum / skinSampleCount),
     } : null;
 
-    // 4. Compute Anatomical Gradient Map (Sobel edges)
+    // 4. Compute Anatomical Gradient Map (Sobel edges + Color gradients)
     const grad = this.computeGradientMap(srcData, width, height);
 
     // 5. Subject Anatomical Core & Landmark Protection:
-    // 0 = unvisited/candidate, 1 = verified background, 2 = protected subject core
+    // 0 = unvisited/candidate, 1 = verified background, 2 = protected subject core (MUTLAK FOREGROUND)
     const classification = new Uint8Array(width * height);
 
-    // 6. Background Evaluation Function
-    const tolerance = Math.max(16, Math.min(48, settings.edgeTolerance));
+    // 6. Background Evaluation Function (Defined early for landmark and seed evaluations)
+    const tolerance = Math.max(14, Math.min(42, settings.edgeTolerance));
 
     const isPixelBackground = (x: number, y: number, pIdx: number): boolean => {
       // Protected subject core CAN NEVER be classified as background!
@@ -391,21 +403,29 @@ export class BackgroundEngine {
         return false;
       }
 
-      // 0. PELINDUNG PIKSEL GELAP SUBJEK (Dark Pixel Foreground Shield):
-      // Pada pas foto studio, latar belakang (merah, biru, putih, abu-abu) disinari lampu studio
-      // dan TIDAK PERNAH sangat gelap. Piksel gelap (rambut, hijab hitam, jas gelap, dasi, bayangan leher)
-      // adalah 100% SUBJEK/FOREGROUND! Jangan pernah menganggap piksel gelap sebagai background
-      // kecuali jika latarnya memang latar hitam (isDarkBg).
+      // 0. Dark Pixel Foreground Shield:
+      // In light or colored backdrops, dark pixels (hair, black hijab, dark tie, dark suit) are 100% subject!
       if (!isDarkBg) {
         const maxRGB = Math.max(r, g, b);
-        if (pLum < 68 || maxRGB < 72 || (pLum < 75 && Math.abs(r - b) < 25 && Math.abs(r - g) < 25)) {
-          return false;
+        const hasChromaBgDominance = (isBlueBg && (b - Math.max(r, g) >= 15)) ||
+                                     (isRedBg && (r - Math.max(g, b) >= 20)) ||
+                                     (isGreenBg && (g - Math.max(r, b) >= 15));
+        if (!hasChromaBgDominance) {
+          if (maxRGB < 65 || (pLum < 70 && Math.abs(r - b) < 25 && Math.abs(r - g) < 25)) {
+            return false;
+          }
         }
+      }
+
+      // In dark backgrounds, bright pixels (white shirt, bright clothing) are 100% FOREGROUND.
+      if (isDarkBg && pLum > 110) {
+        return false;
       }
 
       // 1. Studio Blue Backdrop (Pas Foto Biru Resmi)
       if (isBlueBg) {
         const blueDominance = b - Math.max(r, g);
+        // True blue studio background has sharp blue dominance
         if (blueDominance >= 18 && b >= 65 && pLum >= 35) {
           return true;
         }
@@ -415,18 +435,20 @@ export class BackgroundEngine {
             return true;
           }
         }
+        // Neutral or non-blue pixels in blue backdrop cannot be background
+        return false;
       }
 
       // 2. Studio Red Backdrop (Pas Foto Merah Resmi)
-      // Wajib merah cerah studio murni dengan r >= 90 dan dominasi kuat terhadap hijau & biru.
-      // Melindungi rambut/hijab gelap dari paparan ambient red spill.
       if (isRedBg) {
         const redDominance = r - Math.max(g, b);
-        if (redDominance >= 32 && r >= 90 && pLum >= 48) {
+        if (redDominance >= 28 && r >= 88 && pLum >= 45) {
           if (!this.isSkinTone(r, g, b, skinRef)) {
             return true;
           }
         }
+        // Neutral or non-red pixels in red backdrop cannot be background
+        return false;
       }
 
       // 3. Studio Green Backdrop
@@ -435,29 +457,22 @@ export class BackgroundEngine {
         if (greenDominance >= 20 && g >= 55) {
           return true;
         }
-      }
-
-      // In light backgrounds (studio white/gray), dark pixels (dark hair, black hijab, dark tie, dark suit)
-      // are 100% FOREGROUND! Never treat them as background shadow.
-      if (isLightBg && pLum < 125) {
         return false;
       }
 
-      // In dark backgrounds, bright pixels (white shirt, bright clothing) are 100% FOREGROUND.
-      if (isDarkBg && pLum > 120) {
-        return false;
-      }
+      // 4. White / Light Gray / Neutral Backdrops:
+      // CRITICAL SUBJECT PRESERVATION FOR WHITE/LIGHT CLOTHING:
+      if (isLightBg) {
+        // Dark pixels are 100% subject
+        if (pLum < 125) return false;
 
-      // In saturated colored backgrounds (red, blue, green),
-      // neutral clothing (white shirt, dark hijab/tie) has low saturation and is NOT background!
-      if (isSaturatedBg) {
-        const pSat = Math.max(r, g, b) - Math.min(r, g, b);
-        if (pSat < 22) {
-          return false;
-        }
-        // Perlindungan kemeja putih / hijab cerah pada background merah/biru:
-        if (pLum > 135 && Math.abs(r - g) < 28 && Math.abs(g - b) < 28) {
-          return false;
+        // In clothing region (y >= 44% height):
+        if (y >= Math.floor(height * 0.44)) {
+          // If background is not pure white (e.g. gray or off-white background with bgLum < 235),
+          // a white shirt is brighter than the background!
+          if (bgLum < 235 && pLum > bgLum + 8) {
+            return false; // This is a white shirt / collar / uniform!
+          }
         }
       }
 
@@ -471,14 +486,14 @@ export class BackgroundEngine {
         return true;
       }
 
-      // Shadow on backdrop: only if smooth and chromaticity matches backdrop precisely
-      if (grad[pIdx] < 28) {
+      // Shadow on backdrop: only if smooth (no gradient) and chromaticity matches backdrop precisely
+      if (grad[pIdx] < 18) {
         const pSum = Math.max(1, r + g + b);
         const cr = r / pSum;
         const cg = g / pSum;
         const cb = b / pSum;
         const chromaDist = Math.sqrt((cr - bgCr) ** 2 + (cg - bgCg) ** 2 + (cb - bgCb) ** 2) * 255;
-        if (chromaDist < 16 && colorDist < tolerance * 2.0) {
+        if (chromaDist < 14 && colorDist < tolerance * 1.8) {
           return true;
         }
       }
@@ -486,7 +501,7 @@ export class BackgroundEngine {
       return false;
     };
 
-    // Landmark 1: Human skin tone is 100% protected subject
+    // Landmark 1: Human skin tone is 100% protected subject everywhere!
     for (let y = 0; y < height; y++) {
       const rowOffset = y * width;
       for (let x = 0; x < width; x++) {
@@ -498,41 +513,36 @@ export class BackgroundEngine {
       }
     }
 
-    // Landmark 2: Central Face and Head Core
+    // Landmark 2: Central Face, Eyes, Nose, Mouth and Inner Head Core
     // In formal pas foto framing, head and face are centered around (0.50 * width, 0.35 * height)
-    const faceLeft = Math.floor(width * 0.40);
-    const faceRight = Math.floor(width * 0.60);
-    const faceTop = Math.floor(height * 0.22);
-    const faceBottom = Math.floor(height * 0.46);
+    const faceLeft = Math.floor(width * 0.34);
+    const faceRight = Math.floor(width * 0.66);
+    const faceTop = Math.floor(height * 0.18);
+    const faceBottom = Math.floor(height * 0.48);
     for (let y = faceTop; y <= faceBottom; y++) {
       const rowOffset = y * width;
       for (let x = faceLeft; x <= faceRight; x++) {
         const pIdx = rowOffset + x;
-        if ((isBlueBg || isRedBg || isGreenBg) && isPixelBackground(x, y, pIdx)) {
-          continue;
-        }
         classification[pIdx] = 2; // Protected head core
       }
     }
 
-    // Landmark 3: Torso, Neck, Collar, Tie & Shoulders Core
+    // Landmark 3: Torso, Neck, Collar, Tie, Badges & Shoulders Core
     // In formal pas foto framing, human shoulders start around y=44% and widen to occupy the lower area
     for (let y = Math.floor(height * 0.44); y < height; y++) {
       const rowOffset = y * width;
       const progress = (y - height * 0.44) / (height * 0.56); // 0.0 at neck to 1.0 at bottom
-      const halfW = (0.26 + progress * 0.28) * width;
+      const halfW = (0.28 + progress * 0.26) * width;
       const startX = Math.max(0, Math.floor(width * 0.50 - halfW));
       const endX = Math.min(width - 1, Math.floor(width * 0.50 + halfW));
 
       for (let x = startX; x <= endX; x++) {
         const pIdx = rowOffset + x;
-
-        // On colored backdrops (blue, red, green), any pixel matching the backdrop color
-        // is the backdrop on the sides of the torso, NEVER clothing!
-        if ((isBlueBg || isRedBg || isGreenBg) && isPixelBackground(x, y, pIdx)) {
+        // The central chest is ALWAYS protected (tie, badges, buttons, collar):
+        const isCentralChest = (x >= width * 0.32 && x <= width * 0.68);
+        if (!isCentralChest && (isBlueBg || isRedBg || isGreenBg) && isPixelBackground(x, y, pIdx)) {
           continue;
         }
-
         classification[pIdx] = 2; // Protected torso/clothing core
       }
     }
@@ -551,11 +561,8 @@ export class BackgroundEngine {
       }
     }
 
-    // Seed side borders:
-    // For colored backdrops (blue/red/green), we can safely seed along the entire height (0..height-1)
-    // because clothing/sleeves never have the backdrop color!
-    // For light/neutral backdrops, seed only above shoulder level (y < 38%) to protect white sleeves touching the edges.
-    const maxSideSeedY = (isBlueBg || isRedBg || isGreenBg) ? height : Math.floor(height * 0.38);
+    // Seed side borders ONLY above shoulder level (y < 35% height) to prevent seeding into clothing/sleeves
+    const maxSideSeedY = Math.floor(height * 0.35);
     for (let y = 1; y < maxSideSeedY; y++) {
       const leftIdx = y * width;
       if (classification[leftIdx] === 0 && isPixelBackground(0, y, leftIdx)) {
@@ -570,6 +577,9 @@ export class BackgroundEngine {
     }
 
     // 8. Flood Fill Propagation with Anatomical Edge Barriers
+    // Threshold to stop at subject boundary:
+    const edgeThreshold = (isBlueBg || isRedBg) ? 18 : 12;
+
     while (qHead < qTail) {
       const curr = queue[qHead++];
       const cx = curr % width;
@@ -588,14 +598,13 @@ export class BackgroundEngine {
           const nx = nIdx % width;
           const ny = Math.floor(nIdx / width);
 
-          // Stop at anatomical boundary edge:
-          // On light neutral backdrops, Sobel gradient barrier (hairline, hijab hem, shoulder line, collar)
-          // prevents leaking into white clothing.
-          // On colored backdrops, blue/red backdrop is verified by color dominance and should not be stopped by camera noise.
-          const isDefiniteColoredBg = (isBlueBg && (srcData[nIdx * 4 + 2] - Math.max(srcData[nIdx * 4], srcData[nIdx * 4 + 1]) >= 12)) ||
-                                      (isRedBg && (srcData[nIdx * 4] - Math.max(srcData[nIdx * 4 + 1], srcData[nIdx * 4 + 2]) >= 20));
+          // Stop at anatomical boundary edge (hairline, hijab hem, shoulder line, collar)
+          if (grad[nIdx] > edgeThreshold) {
+            continue;
+          }
 
-          if (!isDefiniteColoredBg && grad[nIdx] > 20) {
+          // Spatial boundary: never flood into the lower central body
+          if (ny > height * 0.52 && nx > width * 0.22 && nx < width * 0.78) {
             continue;
           }
 
@@ -607,118 +616,65 @@ export class BackgroundEngine {
       }
     }
 
-    // 9. Topological Hole Closing & Subject Anchoring:
-    // Any pixel not reached by the exterior background flood fill:
+    // 9. TOPOLOGICAL HOLE CLOSING & MUTLAK SUBJECT PRESERVATION:
+    // Any pixel that was NOT reached by the exterior flood fill from the borders
+    // is completely enclosed within the subject contour (face, hair, hijab, clothes, tie, badge, buttons).
+    // It is 100% FOREGROUND (classification = 2)!
     for (let pIdx = 0; pIdx < width * height; pIdx++) {
       if (classification[pIdx] === 0) {
-        const x = pIdx % width;
-        const y = Math.floor(pIdx / width);
-        // If the pixel clearly matches the backdrop profile and is outside protected subject areas:
-        if (isPixelBackground(x, y, pIdx)) {
-          classification[pIdx] = 1;
-        } else {
-          // Otherwise, it is guaranteed anchored subject foreground (face, hair, hijab, clothing)
-          classification[pIdx] = 2;
-        }
+        classification[pIdx] = 2; // Locked as subject foreground!
       }
     }
 
-    // 10. Natural Local Adaptive Edge Refinement (Penyempurnaan Tepi Sub-Piksel Alami)
-    // - Deteksi pita transisi tepi sempit (narrow transition band).
-    // - Sub-pixel anti-aliasing adaptif: halus & lembut pada rambut & helai halus; rapi & solid pada kontur pakaian/bahu.
-    // - Menjaga bentuk asli subjek, rambut, telinga, leher, dan pakaian tetap utuh 100% tanpa lubang transparan.
-    const mask = new Float32Array(width * height);
-
-    // Inisialisasi mask dasar: 0.0 untuk background terverifikasi, 1.0 untuk subjek
-    for (let i = 0; i < width * height; i++) {
-      mask[i] = classification[i] === 1 ? 0.0 : 1.0;
-    }
-
-    if (settings.edgeFeather > 0) {
-      // Skala resolusi dinamis agar kehalusan tepi seragam antara preview dan ekspor cetak 600 DPI
-      const resScale = Math.max(0.65, Math.min(2.5, width / 700));
-      const baseRadius = Math.max(0.8, Math.min(5.5, settings.edgeFeather * resScale * 0.65));
-      const bodyRadius = Math.max(0.6, Math.min(2.2, baseRadius * 0.60));
-      const maxSearchR = Math.max(Math.ceil(baseRadius), Math.ceil(bodyRadius));
-
-      // Kumpulkan piksel yang berada di garis perbatasan langsung (1-pixel frontier)
-      const boundaryPixels: number[] = [];
-      for (let y = 0; y < height; y++) {
-        const rowOffset = y * width;
-        for (let x = 0; x < width; x++) {
-          const pIdx = rowOffset + x;
-          const isFg = classification[pIdx] === 2;
-          const hasDiff =
-            (x > 0 && (classification[pIdx - 1] === 2) !== isFg) ||
-            (x < width - 1 && (classification[pIdx + 1] === 2) !== isFg) ||
-            (y > 0 && (classification[pIdx - width] === 2) !== isFg) ||
-            (y < height - 1 && (classification[pIdx + width] === 2) !== isFg);
-
-          if (hasDiff) {
-            boundaryPixels.push(pIdx);
+    // Morphological hole closing: clean any 1-2 pixel isolated background noise inside the subject
+    for (let y = 1; y < height - 1; y++) {
+      const rowOffset = y * width;
+      for (let x = 1; x < width - 1; x++) {
+        const pIdx = rowOffset + x;
+        if (classification[pIdx] === 1) {
+          let fgNeighbors = 0;
+          if (classification[pIdx - 1] === 2) fgNeighbors++;
+          if (classification[pIdx + 1] === 2) fgNeighbors++;
+          if (classification[pIdx - width] === 2) fgNeighbors++;
+          if (classification[pIdx + width] === 2) fgNeighbors++;
+          if (classification[pIdx - width - 1] === 2) fgNeighbors++;
+          if (classification[pIdx - width + 1] === 2) fgNeighbors++;
+          if (classification[pIdx + width - 1] === 2) fgNeighbors++;
+          if (classification[pIdx + width + 1] === 2) fgNeighbors++;
+          if (fgNeighbors >= 6) {
+            classification[pIdx] = 2; // Close isolated hole inside subject
           }
         }
       }
+    }
 
-      // Terapkan penyempurnaan hanya pada pita tepi sempit di sekitar perbatasan
-      const processedBand = new Uint8Array(width * height);
-      const headBoundaryY = Math.floor(height * 0.42);
+    // 10. Natural Non-Destructive Alpha Mask Construction:
+    // - Every subject pixel (classification === 2) is guaranteed 100% OPAQUE (mask = 1.0).
+    //   Zero transparency, zero erosion on face, hair, hijab, or clothing!
+    // - Background pixels (classification === 1) are 0.0.
+    // - Feathering is ONLY applied as smooth anti-aliasing on the exterior boundary pixels
+    //   (pixels classified as 1 that touch the subject contour) so edges are smooth without jaggedness.
+    const mask = new Float32Array(width * height);
 
-      for (let b = 0; b < boundaryPixels.length; b++) {
-        const centerIdx = boundaryPixels[b];
-        const cx = centerIdx % width;
-        const cy = Math.floor(centerIdx / width);
+    for (let i = 0; i < width * height; i++) {
+      mask[i] = classification[i] === 2 ? 1.0 : 0.0;
+    }
 
-        const minX = Math.max(0, cx - maxSearchR);
-        const maxX = Math.min(width - 1, cx + maxSearchR);
-        const minY = Math.max(0, cy - maxSearchR);
-        const maxY = Math.min(height - 1, cy + maxSearchR);
-
-        for (let py = minY; py <= maxY; py++) {
-          const rowOffset = py * width;
-          for (let px = minX; px <= maxX; px++) {
-            const pIdx = rowOffset + px;
-            if (processedBand[pIdx] === 1) continue;
-            processedBand[pIdx] = 1;
-
-            const isSubject = classification[pIdx] === 2;
-            const isHead = py < headBoundaryY;
-            const curRadius = isHead ? baseRadius : bodyRadius;
-            const checkR = Math.ceil(curRadius);
-
-            // Hitung jarak Euclidean ke piksel berlawanan terdekat
-            let minDist = 999;
-            const subMinX = Math.max(0, px - checkR);
-            const subMaxX = Math.min(width - 1, px + checkR);
-            const subMinY = Math.max(0, py - checkR);
-            const subMaxY = Math.min(height - 1, py + checkR);
-
-            for (let ny = subMinY; ny <= subMaxY; ny++) {
-              const nRow = ny * width;
-              for (let nx = subMinX; nx <= subMaxX; nx++) {
-                const nIdx = nRow + nx;
-                const isOpposite = isSubject ? (classification[nIdx] === 1) : (classification[nIdx] === 2);
-                if (isOpposite) {
-                  const dx = px - nx;
-                  const dy = py - ny;
-                  const d = Math.sqrt(dx * dx + dy * dy);
-                  if (d < minDist) {
-                    minDist = d;
-                  }
-                }
-              }
+    if (settings.edgeFeather > 0) {
+      // Find boundary pixels and apply anti-aliasing only on the outer background rim touching the subject
+      for (let y = 1; y < height - 1; y++) {
+        const rowOffset = y * width;
+        for (let x = 1; x < width - 1; x++) {
+          const pIdx = rowOffset + x;
+          if (classification[pIdx] === 1) {
+            let hasFgNeighbor = false;
+            if (classification[pIdx - 1] === 2 || classification[pIdx + 1] === 2 ||
+                classification[pIdx - width] === 2 || classification[pIdx + width] === 2) {
+              hasFgNeighbor = true;
             }
 
-            if (minDist > curRadius) {
-              mask[pIdx] = isSubject ? 1.0 : 0.0;
-              continue;
-            }
-
-            const normDist = minDist / Math.max(1e-4, curRadius);
-
-            if (isHead) {
-              // --- ZONA RAMBUT & KEPALA ATAS ---
-              // Menghitung opasitas natural berdasarkan kontras warna lokal terhadap latar asli
+            if (hasFgNeighbor) {
+              // Outer rim anti-aliasing (never touches or erodes the subject interior)
               const i = pIdx * 4;
               const r = srcData[i];
               const g = srcData[i + 1];
@@ -727,38 +683,8 @@ export class BackgroundEngine {
               const dg = g - bgG;
               const db = b - bgB;
               const colorDist = Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 1.732;
-              const colorConfidence = Math.max(0.15, Math.min(1.0, colorDist / Math.max(16, tolerance * 1.25)));
-
-              if (isSubject) {
-                // Foreground rambut/kepala: transisi halus, terlindung minimal 0.65 di tepi terluar
-                const spatialAlpha = 0.5 + 0.5 * normDist;
-                const refinedAlpha = 0.45 * spatialAlpha + 0.55 * colorConfidence;
-                mask[pIdx] = Math.max(0.65, Math.min(1.0, refinedAlpha));
-              } else {
-                // Background yang sangat dekat dengan helai rambut:
-                // Menangkap helai tipis / rambut halus tanpa membocorkan warna latar
-                if (normDist < 0.8 && colorDist > tolerance * 0.9) {
-                  const strandAlpha = (1.0 - normDist / 0.8) * Math.min(0.38, colorDist / (tolerance * 2.5));
-                  mask[pIdx] = Math.max(0.0, Math.min(0.38, strandAlpha));
-                } else {
-                  mask[pIdx] = 0.0;
-                }
-              }
-            } else {
-              // --- ZONA BAHU, LEHER, KERAH & PAKAIAN ---
-              // Kontur geometris tegas dengan anti-aliasing sub-piksel Hermite smoothstep
-              const smooth = normDist * normDist * (3 - 2 * normDist);
-              if (isSubject) {
-                // Pakaian subjek terlindung minimal 0.86 agar warna latar baru tidak tembus ke baju putih/jas
-                mask[pIdx] = Math.max(0.86, 0.86 + 0.14 * smooth);
-              } else {
-                // Anti-aliasing sub-piksel di tepi terluar pakaian
-                if (normDist < 0.75) {
-                  mask[pIdx] = Math.max(0.0, (1.0 - normDist / 0.75) * 0.14);
-                } else {
-                  mask[pIdx] = 0.0;
-                }
-              }
+              const aaAlpha = Math.max(0.12, Math.min(0.35, (colorDist / Math.max(1, tolerance * 1.2)) * 0.35));
+              mask[pIdx] = aaAlpha;
             }
           }
         }
@@ -775,10 +701,6 @@ export class BackgroundEngine {
     return { mask, safety, bgR, bgG, bgB, skinRef };
   }
 
-  /**
-   * Applies background replacement with automatic subject matting,
-   * natural positioning, scale, perspective, light harmonization, and DoF blur.
-   */
   public static applyBackgroundReplacement(
     targetCanvas: HTMLCanvasElement,
     bgType: BackgroundType,
