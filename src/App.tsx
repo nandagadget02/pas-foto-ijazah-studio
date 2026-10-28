@@ -212,12 +212,7 @@ export default function App() {
   const [activeStepTab, setActiveStepTab] = useState<StudioStepTab>('adjust');
   const studioToolsRef = useRef<HTMLDivElement>(null);
 
-  // Reset printer tab jika berpindah ke mode color
-  useEffect(() => {
-    if (photoMode === 'color' && activeStepTab === 'printer') {
-      setActiveStepTab('adjust');
-    }
-  }, [photoMode, activeStepTab]);
+  // Kompensasi cetak selalu tersedia untuk B&W dan Color
 
   // Trigger Gemini Analysis automatically on new image upload
   const runAnalysis = useCallback(
@@ -2391,29 +2386,27 @@ export default function App() {
                 )}
               </button>
 
-              {photoMode === 'bw' && (
-                <button
-                  type="button"
-                  onClick={() => setActiveStepTab('printer')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeStepTab === 'printer'
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                      : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+              <button
+                type="button"
+                onClick={() => setActiveStepTab('printer')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeStepTab === 'printer'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                4. Kompensasi Cetak
+                <span
+                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                    printerCompensation.enabled
+                      ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
+                      : 'bg-slate-800 text-slate-400'
                   }`}
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  4. Kompensasi Cetak
-                  <span
-                    className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      printerCompensation.enabled
-                        ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {printerCompensation.enabled ? 'ON' : 'OFF'}
-                  </span>
-                </button>
-              )}
+                  {printerCompensation.enabled ? 'ON' : 'OFF'}
+                </span>
+              </button>
 
               <button
                 type="button"
@@ -2425,7 +2418,7 @@ export default function App() {
                 }`}
               >
                 <Printer className="w-3.5 h-3.5" />
-                {photoMode === 'bw' ? '5.' : '4.'} Export & Download
+                5. Export & Download
               </button>
             </div>
 
@@ -2701,7 +2694,7 @@ export default function App() {
               </div>
             )}
 
-            {activeStepTab === 'printer' && photoMode === 'bw' && (
+            {activeStepTab === 'printer' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* KOLOM KIRI: HASIL PAS FOTO IJAZAH (LIVE PREVIEW 600 DPI) */}
                 <div className="w-full lg:col-span-5 xl:col-span-5 lg:sticky lg:top-24">

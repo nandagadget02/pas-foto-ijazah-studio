@@ -19,21 +19,13 @@ export interface StudioStepInfo {
   shortName: string;
 }
 
-export function getStudioSteps(mode: PhotoMode): StudioStepInfo[] {
-  if (mode === 'bw') {
-    return [
-      { id: 'adjust', stepNumber: 1, label: '1. Manual Adjustment', shortName: 'Manual Adjustment' },
-      { id: 'crop', stepNumber: 2, label: '2. Ukuran & Crop Framing', shortName: 'Ukuran & Crop' },
-      { id: 'background', stepNumber: 3, label: '3. Ganti Latar Belakang', shortName: 'Ganti Latar' },
-      { id: 'printer', stepNumber: 4, label: '4. Kompensasi Cetak', shortName: 'Kompensasi Cetak' },
-      { id: 'export', stepNumber: 5, label: '5. Export & Download', shortName: 'Export & Download' },
-    ];
-  }
+export function getStudioSteps(mode?: PhotoMode): StudioStepInfo[] {
   return [
     { id: 'adjust', stepNumber: 1, label: '1. Manual Adjustment', shortName: 'Manual Adjustment' },
     { id: 'crop', stepNumber: 2, label: '2. Ukuran & Crop Framing', shortName: 'Ukuran & Crop' },
     { id: 'background', stepNumber: 3, label: '3. Ganti Latar Belakang', shortName: 'Ganti Latar' },
-    { id: 'export', stepNumber: 4, label: '4. Export & Download', shortName: 'Export & Download' },
+    { id: 'printer', stepNumber: 4, label: '4. Kompensasi Cetak', shortName: 'Kompensasi Cetak' },
+    { id: 'export', stepNumber: 5, label: '5. Export & Download', shortName: 'Export & Download' },
   ];
 }
 
