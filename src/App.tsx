@@ -1180,19 +1180,40 @@ export default function App() {
     batchAbortControllersRef.current.forEach((ctrl) => ctrl.abort());
     batchAbortControllersRef.current.clear();
 
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+
     batchItems.forEach((it) => {
       if (it.previewUrl) URL.revokeObjectURL(it.previewUrl);
     });
     batchItemsRef.current = [];
     setBatchItems([]);
     setActiveBatchItemId(null);
+    previewCacheRef.current.clear();
+    activeMaskRef.current = null;
+    rawCroppedCanvasRef.current = null;
+    lastCompositeCanvasRef.current = null;
+
     setSourceImage(null);
     setSourceFile(null);
     setImageMetadata(null);
     setAnalysisResult(null);
+    setLocalAnalysisResult(null);
+    setGeminiAnalysisResult(null);
+    setAnalysisError(null);
     setProcessedCanvas(null);
     setMasterCanvas(null);
     setPrintCanvas(null);
+    setAdjustments(GeminiService.getInitialAdjustments());
+    setPreviousAdjustments(null);
+    setRotation(0);
+    setPreviousRotation(null);
+    setCustomMask(null);
+    setMaskHistory([]);
+    setMaskRedoStack([]);
+    setIsComparisonOpen(false);
   }, [batchItems]);
 
   // 5. Start Batch Processing (Centralized Queue, Conservative Concurrency: 1 at a time)
@@ -1930,6 +1951,104 @@ export default function App() {
     );
   };
 
+  // Handle Reset Total Sesi Foto (Ganti Foto & Kembali Bersih ke Upload Awal)
+  const handleResetPhotoSession = useCallback(() => {
+    // 1. Batalkan semua operasi asinkron yang sedang berjalan & timer debounce
+    if (singleAnalysisAbortControllerRef.current) {
+      singleAnalysisAbortControllerRef.current.abort();
+      singleAnalysisAbortControllerRef.current = null;
+    }
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    setIsAnalyzing(false);
+    setIsProcessingPreview(false);
+
+    // 2. Bersihkan memori Blob / Object URL jika ada background kustom
+    if (customBgPreviewUrl) {
+      try {
+        URL.revokeObjectURL(customBgPreviewUrl);
+      } catch (e) {
+        console.warn('Gagal membersihkan URL objek background:', e);
+      }
+      setCustomBgPreviewUrl(null);
+    }
+    setCustomBgImage(null);
+
+    // 3. Bersihkan cache preview & referensi canvas internal
+    previewCacheRef.current.clear();
+    activeMaskRef.current = null;
+    rawCroppedCanvasRef.current = null;
+    lastCompositeCanvasRef.current = null;
+
+    // 4. Reset Sumber Gambar & Metadata Foto
+    setSourceImage(null);
+    setSourceFile(null);
+    setImageMetadata(null);
+
+    // 5. Reset Seluruh Canvas Hasil & Print
+    setMasterCanvas(null);
+    setProcessedCanvas(null);
+    setPrintCanvas(null);
+
+    // 6. Reset Seluruh Parameter Penyesuaian & Tonal ke Nilai Bawaan
+    setAdjustments(GeminiService.getInitialAdjustments());
+    setPreviousAdjustments(null);
+    setTargetTone('natural');
+    setEditTargetMode('subject_only');
+
+    // 7. Reset Pengaturan Crop, Rotasi, Framing & Penajaman Wajah
+    setSelectedDimension(STANDARD_OUTPUT_DIMENSIONS[0]); // 3x4 cm
+    setCropRect({
+      x: 0,
+      y: 0,
+      width: 600,
+      height: 800,
+    });
+    setCropWarning(null);
+    setRotation(0);
+    setPreviousRotation(null);
+    setFramingSettings(DEFAULT_FRAMING_SETTINGS);
+    setFaceSharpenSettings(DEFAULT_FACE_SHARPEN_SETTINGS);
+
+    // 8. Reset Pengaturan Background & Masking Diagnostik
+    setBgType('preserve');
+    setBgRemovalMode('remove');
+    setBgSettings(DEFAULT_BG_SETTINGS);
+    setDetectedBgColor(undefined);
+    setSegmentationWarning(null);
+    setDiagnosticMode('composite');
+    setBrushSettings(DEFAULT_MASK_BRUSH);
+    setIsBrushActive(false);
+    setCustomMask(null);
+    setMaskVersion(0);
+    setMaskHistory([]);
+    setMaskRedoStack([]);
+    setEdgeInspectionFocus('fit');
+
+    // 9. Reset Hasil Analisis AI & Status Error
+    setLocalAnalysisResult(null);
+    setGeminiAnalysisResult(null);
+    setAnalysisResult(null);
+    setAnalysisError(null);
+    setAnalysisStepText('Menganalisis foto...');
+    setIsShowingAnalysisDetails(false);
+
+    // 10. Reset Tampilan Komparasi Before/After & Target Kompensasi Printer
+    setIsComparisonOpen(false);
+    setPrinterCompensation(DEFAULT_PRINTER_COMPENSATION);
+    setActivePreviewTarget('master');
+
+    // 11. Reset Format & Kualitas Ekspor
+    setExportFormat('png');
+    setExportQuality(1.0);
+
+    // 12. Kembalikan Tab Navigasi Aktif ke Tab Awal
+    setActiveStepTab('adjust');
+    activeStepTabRef.current = 'adjust';
+  }, [customBgPreviewUrl]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Studio Header */}
@@ -2045,16 +2164,7 @@ export default function App() {
             ) : sourceImage ? (
               <button
                 type="button"
-                onClick={() => {
-                  setSourceImage(null);
-                  setSourceFile(null);
-                  setImageMetadata(null);
-                  setLocalAnalysisResult(null);
-                  setGeminiAnalysisResult(null);
-                  setAnalysisResult(null);
-                  setPreviousAdjustments(null);
-                  setAnalysisError(null);
-                }}
+                onClick={handleResetPhotoSession}
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
