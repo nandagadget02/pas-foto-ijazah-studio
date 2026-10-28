@@ -106,13 +106,13 @@ const SliderRow: React.FC<SliderRowProps> = ({
   const isModified = Math.abs(safeValue - defaultValue) > 0.001;
 
   return (
-    <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 hover:border-slate-700/80 transition-colors">
-      <div className="flex items-center justify-between mb-2">
-        <div>
+    <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 hover:border-slate-700/80 transition-colors min-w-0 box-border">
+      <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+        <div className="min-w-0 truncate">
           <span className="text-xs font-semibold text-slate-200">{label}</span>
           {sublabel && <span className="text-[11px] text-slate-400 ml-1.5 hidden sm:inline">({sublabel})</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span
             className={`font-mono text-xs font-semibold px-2 py-0.5 rounded ${
               isModified
@@ -128,7 +128,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
               type="button"
               onClick={handleReset}
               title="Reset slider ini"
-              className="text-slate-500 hover:text-amber-400 p-1 rounded hover:bg-slate-800 transition-colors cursor-pointer"
+              className="text-slate-500 hover:text-amber-400 p-1 rounded hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             >
               <RotateCcw className="w-3 h-3" />
             </button>
@@ -136,7 +136,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <button
           type="button"
           onClick={handleDecrement}
@@ -157,7 +157,7 @@ const SliderRow: React.FC<SliderRowProps> = ({
             const parsed = parseFloat(e.target.value);
             onChange(isNaN(parsed) ? defaultValue : parsed);
           }}
-          className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300 focus:outline-none"
+          className="flex-1 min-w-0 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300 focus:outline-none"
         />
 
         <button
@@ -1043,14 +1043,14 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
           onChange={(v) => updateParam('blacks', v)}
         />
 
-        {/* Levels (Tingkat Tonal) Control Card */}
-        <div className="col-span-1 sm:col-span-2 bg-slate-950/60 border border-slate-800/90 rounded-2xl p-4 transition-all mt-1">
-          <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-semibold tracking-wider uppercase text-cyan-400 bg-cyan-400/10 px-2.5 py-1 rounded-md border border-cyan-400/20">
+        {/* Levels (Tingkat Tonal) Control Card - 2-Column Responsive Grid */}
+        <div className="col-span-1 sm:col-span-2 bg-slate-950/60 border border-slate-800/90 rounded-2xl p-4 transition-all mt-1 min-w-0 box-border">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-slate-800/80">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-mono font-semibold tracking-wider uppercase text-cyan-400 bg-cyan-400/10 px-2.5 py-1 rounded-md border border-cyan-400/20 shrink-0">
                 Levels (Tingkat Tonal)
               </span>
-              <span className="text-[11px] text-slate-400 hidden md:inline">
+              <span className="text-[11px] text-slate-400 truncate hidden sm:inline">
                 Titik Hitam, Midtone Gamma & Titik Putih
               </span>
             </div>
@@ -1066,14 +1066,16 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
                   levelsOutWhite: 255,
                 });
               }}
-              className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/60 rounded-md transition-colors cursor-pointer"
+              className="self-start sm:self-auto px-2.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/60 rounded-md transition-colors cursor-pointer shrink-0"
               title="Reset kontrol Levels ke nilai netral (0, 1.0, 255)"
             >
               Reset Levels
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {/* Grid 2 Kolom Seimbang: Baris 1: Black Point & Midtone Gamma | Baris 2: White Point & Output Levels */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 min-w-0">
+            {/* Baris Pertama: Black Point */}
             <SliderRow
               label="Black Point"
               sublabel="Input Hitam"
@@ -1085,6 +1087,7 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
               onChange={(v) => updateParam('levelsInBlack', v)}
             />
 
+            {/* Baris Pertama: Midtones / Gamma */}
             <SliderRow
               label="Midtones / Gamma"
               sublabel="Nada Tengah"
@@ -1096,6 +1099,7 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
               onChange={(v) => updateParam('levelsGamma', v)}
             />
 
+            {/* Baris Kedua: White Point */}
             <SliderRow
               label="White Point"
               sublabel="Input Putih"
@@ -1106,20 +1110,43 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
               defaultValue={255}
               onChange={(v) => updateParam('levelsInWhite', v)}
             />
+
+            {/* Baris Kedua: Output Levels Trigger Card Seimbang di Kolom 2 */}
+            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-center min-w-0 box-border hover:border-slate-700/80 transition-colors">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0 truncate">
+                  <span className="text-xs font-semibold text-slate-200 block truncate">
+                    Output Levels
+                  </span>
+                  <span className="text-[11px] text-slate-400 block truncate">
+                    {showOutputLevels
+                      ? `Aktif: ${params.levelsOutBlack ?? 0} s/d ${params.levelsOutWhite ?? 255}`
+                      : 'Batas gelap & terang rentang'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowOutputLevels((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border ${
+                    showOutputLevels
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                  }`}
+                >
+                  <span>{showOutputLevels ? 'Tutup Kontrol' : 'Buka Kontrol'}</span>
+                  <span className="text-[10px]">{showOutputLevels ? '▲' : '▼'}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Kontrol Lanjutan (Output Levels) Expandable */}
-          <div className="mt-3 pt-2.5 border-t border-slate-800/60">
-            <button
-              type="button"
-              onClick={() => setShowOutputLevels((prev) => !prev)}
-              className="text-[11px] text-slate-400 hover:text-cyan-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>{showOutputLevels ? '▼ Sembunyikan Kontrol Lanjutan (Output Levels)' : '▶ Tampilkan Kontrol Lanjutan (Output Levels)'}</span>
-            </button>
-
-            {showOutputLevels && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-3 pt-2">
+          {/* Kontrol Lanjutan (Output Levels) 2 Kolom saat dibuka */}
+          {showOutputLevels && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 min-w-0">
+              <div className="text-[11px] font-mono text-cyan-400 uppercase tracking-wider mb-2.5">
+                Output Levels (Rentang Tonal Keluaran)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 min-w-0">
                 <SliderRow
                   label="Output Black"
                   sublabel="Batas Gelap Minimum"
@@ -1142,8 +1169,8 @@ export const ManualAdjustmentSliders: React.FC<ManualAdjustmentSlidersProps> = (
                   onChange={(v) => updateParam('levelsOutWhite', v)}
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
