@@ -59,6 +59,34 @@ export class ToneEngine {
       satMagentas !== 0
     );
 
+    // Levels (Tingkat Input & Output Tonal) precalculation
+    const inBlack = Math.max(0, Math.min(254, params.levelsInBlack ?? 0));
+    const inWhite = Math.max(inBlack + 1, Math.min(255, params.levelsInWhite ?? 255));
+    const gamma = Math.max(0.1, Math.min(3.0, params.levelsGamma ?? 1.0));
+    const outBlack = Math.max(0, Math.min(255, params.levelsOutBlack ?? 0));
+    const outWhite = Math.max(0, Math.min(255, params.levelsOutWhite ?? 255));
+
+    const hasLevels = inBlack !== 0 || gamma !== 1.0 || inWhite !== 255 || outBlack !== 0 || outWhite !== 255;
+    let levelsLut: Uint8Array | null = null;
+    if (hasLevels) {
+      levelsLut = new Uint8Array(256);
+      const inRange = inWhite - inBlack;
+      const outRange = outWhite - outBlack;
+      const invGamma = 1.0 / gamma;
+      for (let v = 0; v < 256; v++) {
+        let norm = (v - inBlack) / inRange;
+        if (norm <= 0) {
+          norm = 0;
+        } else if (norm >= 1) {
+          norm = 1;
+        } else {
+          norm = Math.pow(norm, invGamma);
+        }
+        const mapped = outBlack + norm * outRange;
+        levelsLut[v] = Math.round(Math.max(0, Math.min(255, mapped)));
+      }
+    }
+
     // Precalculate tone lookup table (LUT) for basic 0..255 if applicable,
     // but highlights/shadows depend on local pixel luminance.
     for (let i = 0; i < data.length; i += 4) {
@@ -95,7 +123,10 @@ export class ToneEngine {
         }
 
         // Clamp to 0..255
-        const finalVal = Math.round(Math.max(0, Math.min(255, lum)));
+        let finalVal = Math.round(Math.max(0, Math.min(255, lum)));
+        if (levelsLut) {
+          finalVal = levelsLut[finalVal];
+        }
 
         // TRUE GRAYSCALE: R === G === B. Absolute zero color cast!
         data[i] = finalVal;
@@ -143,6 +174,13 @@ export class ToneEngine {
           r += sShift;
           g += sShift;
           b += sShift;
+        }
+
+        // 5b. Levels Tonal Mapping (Input Black, Gamma, Input White, Output Black, Output White)
+        if (levelsLut) {
+          r = levelsLut[Math.round(Math.max(0, Math.min(255, r)))];
+          g = levelsLut[Math.round(Math.max(0, Math.min(255, g)))];
+          b = levelsLut[Math.round(Math.max(0, Math.min(255, b)))];
         }
 
         // 6. Saturation

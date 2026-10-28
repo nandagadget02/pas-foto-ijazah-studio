@@ -188,6 +188,12 @@ export interface AdjustmentParams {
   satCyan?: number;
   satBlue?: number;
   satMagenta?: number;
+  // Levels (Tingkat Input & Output Tonal)
+  levelsInBlack?: number; // 0 to 254, default 0
+  levelsGamma?: number; // 0.10 to 3.00, default 1.00
+  levelsInWhite?: number; // 1 to 255, default 255
+  levelsOutBlack?: number; // 0 to 255, default 0
+  levelsOutWhite?: number; // 0 to 255, default 255
 }
 
 export interface OutputDimension {

@@ -366,6 +366,11 @@ export class ImageProcessor {
             satCyan: 0,
             satBlue: 0,
             satMagenta: 0,
+            levelsInBlack: 0,
+            levelsGamma: 1.0,
+            levelsInWhite: 255,
+            levelsOutBlack: 0,
+            levelsOutWhite: 255,
           };
           ToneEngine.applyTonalAdjustments(baseCropData, neutralParams, mode, 'natural');
         } else {

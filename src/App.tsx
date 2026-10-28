@@ -407,6 +407,11 @@ export default function App() {
       satCyan: 0,
       satBlue: 0,
       satMagenta: 0,
+      levelsInBlack: 0,
+      levelsGamma: 1.0,
+      levelsInWhite: 255,
+      levelsOutBlack: 0,
+      levelsOutWhite: 255,
     };
 
     setAdjustments(newAdjustments);
@@ -453,6 +458,11 @@ export default function App() {
       (adjustments.satCyan ?? 0) !== 0 ||
       (adjustments.satBlue ?? 0) !== 0 ||
       (adjustments.satMagenta ?? 0) !== 0 ||
+      (adjustments.levelsInBlack ?? 0) !== 0 ||
+      Math.abs((adjustments.levelsGamma ?? 1.0) - 1.0) > 0.01 ||
+      (adjustments.levelsInWhite ?? 255) !== 255 ||
+      (adjustments.levelsOutBlack ?? 0) !== 0 ||
+      (adjustments.levelsOutWhite ?? 255) !== 255 ||
       targetTone !== 'natural';
 
     if (isChanged) {
@@ -891,6 +901,11 @@ export default function App() {
             satCyan: 0,
             satBlue: 0,
             satMagenta: 0,
+            levelsInBlack: 0,
+            levelsGamma: 1.0,
+            levelsInWhite: 255,
+            levelsOutBlack: 0,
+            levelsOutWhite: 255,
           }
         : GeminiService.getInitialAdjustments();
 
@@ -1700,6 +1715,11 @@ export default function App() {
       adjustments.satCyan ?? 0,
       adjustments.satBlue ?? 0,
       adjustments.satMagenta ?? 0,
+      adjustments.levelsInBlack ?? 0,
+      adjustments.levelsGamma ?? 1.0,
+      adjustments.levelsInWhite ?? 255,
+      adjustments.levelsOutBlack ?? 0,
+      adjustments.levelsOutWhite ?? 255,
       bgSettings.subjectScale,
       bgSettings.subjectRotation,
       bgSettings.subjectOffsetX,

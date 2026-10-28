@@ -870,6 +870,11 @@ FORMAT OUTPUT WAJIB: JSON murni tanpa markdown/backticks sesuai struktur berikut
       satCyan: 0,
       satBlue: 0,
       satMagenta: 0,
+      levelsInBlack: 0,
+      levelsGamma: 1.0,
+      levelsInWhite: 255,
+      levelsOutBlack: 0,
+      levelsOutWhite: 255,
     };
   }
 }

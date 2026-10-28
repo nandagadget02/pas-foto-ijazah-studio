@@ -186,6 +186,11 @@ export class AIRecommendationPresetService {
       satCyan: Math.round(this.clamp(p.satCyan, -100, 100, 0)),
       satBlue: Math.round(this.clamp(p.satBlue, -100, 100, 0)),
       satMagenta: Math.round(this.clamp(p.satMagenta, -100, 100, 0)),
+      levelsInBlack: Math.round(this.clamp(p.levelsInBlack, 0, 254, 0)),
+      levelsGamma: Number(this.clamp(p.levelsGamma, 0.1, 3.0, 1.0).toFixed(2)),
+      levelsInWhite: Math.round(this.clamp(p.levelsInWhite, 1, 255, 255)),
+      levelsOutBlack: Math.round(this.clamp(p.levelsOutBlack, 0, 255, 0)),
+      levelsOutWhite: Math.round(this.clamp(p.levelsOutWhite, 0, 255, 255)),
     };
   }
 
