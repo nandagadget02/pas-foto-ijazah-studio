@@ -430,14 +430,20 @@ export class BackgroundEngine {
       if (isBlueBg) {
         const blueDominance = b - Math.max(r, g);
         // True blue studio background has sharp blue dominance
-        if (blueDominance >= 18 && b >= 65 && pLum >= 35) {
+        if (blueDominance >= 14 && b >= 55 && pLum >= 30) {
           return true;
         }
-        if (b > r + 15 && b > g + 12 && b >= 60 && pLum >= 35) {
+        if (b > r + 10 && b >= g + 6 && b >= 50 && pLum >= 28) {
           const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
-          if (cb > 142) {
+          if (cb > 135) {
             return true;
           }
+        }
+        // Shadow on blue backdrop: smooth chroma match
+        const dr = r - bgR, dg = g - bgG, db = b - bgB;
+        const colorDist = Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 1.732;
+        if (colorDist <= tolerance * 1.25 && b > r + 6) {
+          return true;
         }
         // Neutral or non-blue pixels in blue backdrop cannot be background
         return false;
@@ -625,20 +631,31 @@ export class BackgroundEngine {
           const nx = nIdx % width;
           const ny = Math.floor(nIdx / width);
 
-          // Stop at anatomical boundary edge (hairline, hijab hem, shoulder line, collar)
-          if (grad[nIdx] > edgeThreshold) {
-            continue;
-          }
-
           // Spatial boundary: never flood into the lower central body
           if (ny > height * 0.52 && nx > width * 0.22 && nx < width * 0.78) {
             continue;
           }
 
-          if (isPixelBackground(nx, ny, nIdx)) {
-            classification[nIdx] = 1;
-            queue[qTail++] = nIdx;
+          // Evaluate if neighbor pixel belongs to background
+          if (!isPixelBackground(nx, ny, nIdx)) {
+            continue;
           }
+
+          // Stop at anatomical boundary edge (hairline, hijab hem, shoulder line, collar)
+          // Pixels whose color is an exact match to the background are NOT blocked
+          // because 3x3 Sobel gradient naturally elevates on background pixels right next to a subject edge.
+          if (grad[nIdx] > edgeThreshold) {
+            const pI = nIdx * 4;
+            const pR = srcData[pI], pG = srcData[pI + 1], pB = srcData[pI + 2];
+            const dr = pR - bgR, dg = pG - bgG, db = pB - bgB;
+            const distFromBg = Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 1.732;
+            if (distFromBg > tolerance * 0.55) {
+              continue;
+            }
+          }
+
+          classification[nIdx] = 1;
+          queue[qTail++] = nIdx;
         }
       }
     }
@@ -693,15 +710,20 @@ export class BackgroundEngine {
           const pIdx = rowOffset + x;
           // Apply anti-aliasing ONLY on the subject's outermost border pixel (never on background!)
           if (classification[pIdx] === 2) {
-            let hasBgNeighbor = false;
-            if (classification[pIdx - 1] === 1 || classification[pIdx + 1] === 1 ||
-                classification[pIdx - width] === 1 || classification[pIdx + width] === 1) {
-              hasBgNeighbor = true;
-            }
+            let bgNeighbors = 0;
+            if (classification[pIdx - 1] === 1) bgNeighbors++;
+            if (classification[pIdx + 1] === 1) bgNeighbors++;
+            if (classification[pIdx - width] === 1) bgNeighbors++;
+            if (classification[pIdx + width] === 1) bgNeighbors++;
+            if (classification[pIdx - width - 1] === 1) bgNeighbors++;
+            if (classification[pIdx - width + 1] === 1) bgNeighbors++;
+            if (classification[pIdx - width - 1] === 1) bgNeighbors++;
+            if (classification[pIdx + width + 1] === 1) bgNeighbors++;
 
-            if (hasBgNeighbor) {
-              // Smooth boundary transition on the subject's edge
-              mask[pIdx] = 0.90;
+            if (bgNeighbors > 0) {
+              // Adaptive sub-pixel coverage (box-filter geometric coverage)
+              const coverage = Math.max(0.50, Math.min(0.92, 1.0 - bgNeighbors * 0.08));
+              mask[pIdx] = coverage;
             }
           }
         }
@@ -753,7 +775,7 @@ export class BackgroundEngine {
       ? new Uint8ClampedArray(subjectImageData.data)
       : new Uint8ClampedArray(sourceImageData.data);
 
-    // 4. Targeted Spill Decontamination & Defringing (Konservatif pada Pita Tepi)
+    // 4. Targeted Multi-Pixel Spill Decontamination & Defringing
     // Menghilangkan fringe/halo warna latar lama pada helai rambut, telinga, kerah baju, dan bahu
     // tanpa mengubah warna asli interior tubuh/pakaian.
     if (settings.spillRemoval > 0 && bgType !== 'preserve') {
@@ -765,125 +787,190 @@ export class BackgroundEngine {
       const isYellowBg = (bgR > bgB + 30 && bgG > bgB + 25 && Math.abs(bgR - bgG) < 55);
       const isLightBg = bgLum > 165;
 
+      // Compute exact distance to background boundary (d = 1 to 6)
+      const edgeDist = new Uint8Array(width * height);
+      const q: number[] = [];
+
+      for (let pIdx = 0; pIdx < width * height; pIdx++) {
+        if (mask[pIdx] <= 0.001) {
+          edgeDist[pIdx] = 0;
+        } else {
+          edgeDist[pIdx] = 255;
+        }
+      }
+
+      // Step 1: find d = 1 (foreground pixels that directly touch background)
       for (let y = 0; y < height; y++) {
         const rowOffset = y * width;
         for (let x = 0; x < width; x++) {
           const pIdx = rowOffset + x;
-          const alpha = mask[pIdx];
-          if (alpha <= 0.001) continue;
-
-          // Target HANYA pada piksel pita tepi (transisi semi-transparan atau berjarak <= 2 piksel dari latar)
-          const isNearEdge = alpha < 0.99 || (
-            (x > 0 && mask[pIdx - 1] < 0.92) ||
-            (x < width - 1 && mask[pIdx + 1] < 0.92) ||
-            (y > 0 && mask[pIdx - width] < 0.92) ||
-            (y < height - 1 && mask[pIdx + width] < 0.92) ||
-            (x > 1 && mask[pIdx - 2] < 0.80) ||
-            (x < width - 2 && mask[pIdx + 2] < 0.80)
-          );
-
-          if (!isNearEdge) continue;
-
-          const i = pIdx * 4;
-          let r = cutoutSource[i];
-          let g = cutoutSource[i + 1];
-          let b = cutoutSource[i + 2];
-          const pLum = 0.299 * r + 0.587 * g + 0.114 * b;
-
-          // A. Mathematical Color Unmixing untuk piksel semi-transparan (0.10 < alpha < 0.88)
-          // Memulihkan warna murni subjek (foreground) dari campuran optik latar lama
-          if (alpha < 0.88 && alpha > 0.10) {
-            const bgWeight = (1.0 - alpha) * 0.40 * spillFactor;
-            r = Math.round(Math.max(0, Math.min(255, r - bgWeight * (bgR - 128))));
-            g = Math.round(Math.max(0, Math.min(255, g - bgWeight * (bgG - 128))));
-            b = Math.round(Math.max(0, Math.min(255, b - bgWeight * (bgB - 128))));
+          if (edgeDist[pIdx] === 255) {
+            if ((x > 0 && edgeDist[pIdx - 1] === 0) ||
+                (x < width - 1 && edgeDist[pIdx + 1] === 0) ||
+                (y > 0 && edgeDist[pIdx - width] === 0) ||
+                (y < height - 1 && edgeDist[pIdx + width] === 0)) {
+              edgeDist[pIdx] = 1;
+              q.push(pIdx);
+            }
           }
+        }
+      }
 
-          // B. De-fringing Latar Biru Resmi (Pas Foto Biru)
-          if (isBlueBg) {
+      // Step 2: expand distance map inward up to 6 pixels
+      let qIdx = 0;
+      while (qIdx < q.length) {
+        const curr = q[qIdx++];
+        const d = edgeDist[curr];
+        if (d >= 6) continue;
+        const cx = curr % width;
+        const cy = Math.floor(curr / width);
+        const nbs = [
+          cx > 0 ? curr - 1 : -1,
+          cx < width - 1 ? curr + 1 : -1,
+          cy > 0 ? curr - width : -1,
+          cy < height - 1 ? curr + width : -1
+        ];
+        for (let k = 0; k < 4; k++) {
+          const ni = nbs[k];
+          if (ni >= 0 && edgeDist[ni] > d + 1) {
+            edgeDist[ni] = d + 1;
+            q.push(ni);
+          }
+        }
+      }
+
+      // Step 3: Decontaminate all pixels within the 1..6 pixel boundary transition band
+      for (let pIdx = 0; pIdx < width * height; pIdx++) {
+        const d = edgeDist[pIdx];
+        if (d < 1 || d > 6) continue;
+
+        const alpha = mask[pIdx];
+        if (alpha <= 0.001) continue;
+
+        const i = pIdx * 4;
+        let r = cutoutSource[i];
+        let g = cutoutSource[i + 1];
+        let b = cutoutSource[i + 2];
+        const pLum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const weight = Math.max(0.25, (7 - d) / 6) * spillFactor;
+
+        // A. Mathematical Color Unmixing untuk piksel semi-transparan (0.10 < alpha < 0.90)
+        if (alpha < 0.90 && alpha > 0.10) {
+          const bgWeight = (1.0 - alpha) * 0.45 * spillFactor;
+          r = Math.round(Math.max(0, Math.min(255, r - bgWeight * (bgR - 128))));
+          g = Math.round(Math.max(0, Math.min(255, g - bgWeight * (bgG - 128))));
+          b = Math.round(Math.max(0, Math.min(255, b - bgWeight * (bgB - 128))));
+        }
+
+        // B. Decontamination Latar Biru Resmi (Pas Foto Biru)
+        if (isBlueBg) {
+          const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : (r > g && g > b && r - b > 15);
+
+          if (isSkin) {
+            // Telinga, pipi, rahang, dan leher:
+            // Hilangkan pantulan biru agar pinggiran kulit tidak tampak abu-abu atau sianosis/dingin
+            const targetB = Math.min(b, Math.round(g * 0.92));
+            b = Math.round(b * (1 - weight) + targetB * weight);
+            if (r < g + 12) {
+              const targetR = Math.round(g * 1.15 + 10);
+              r = Math.round(r * (1 - weight) + targetR * weight);
+            }
+          } else if (pLum < 105) {
+            // Rambut hitam/gelap dan Jas/pakaian gelap:
+            // 1. Pangkas tuntas lonjakan biru (blue peak)
             const maxRG = Math.max(r, g);
             if (b > maxRG) {
-              const excessB = b - maxRG;
-              b = Math.round(b - excessB * spillFactor * 0.94);
-            }
-            // Kerah baju putih / pakaian terang (menghilangkan halo biru)
-            if (r >= 110 && g >= 110 && Math.abs(r - g) < 26) {
-              const maxChan = Math.max(r, g, b);
-              r = Math.max(r, Math.round(maxChan * 0.96));
-              g = Math.max(g, Math.round(maxChan * 0.96));
-              b = Math.min(b, Math.max(r, g));
-            }
-            // Rambut hitam / gelap (menghilangkan pantulan biru pada helai rambut)
-            if (pLum < 90) {
-              b = Math.min(b, Math.max(r, g));
-            }
-          }
-
-          // C. De-fringing Latar Merah Resmi (Pas Foto Merah)
-          if (isRedBg) {
-            const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : (r > g && g > b && r - b > 20);
-            const maxGB = Math.max(g, b);
-            if (!isSkin) {
-              // Tepi rambut, hijab, jas, kerah, bahu
-              if (r > maxGB) {
-                const excessR = r - maxGB;
-                r = Math.round(r - excessR * spillFactor * 0.94);
-              }
-              // Kerah kemeja putih (menghilangkan semburat merah muda/pink pada kain putih)
-              if (g >= 110 && b >= 110 && Math.abs(g - b) < 26) {
-                const targetR = Math.round((g + b) * 0.5);
-                r = Math.round(r * (1 - spillFactor) + targetR * spillFactor);
-              }
-              // Rambut / kain gelap
-              if (pLum < 95) {
-                r = Math.min(r, Math.round(maxGB * 1.05));
-              }
-            } else {
-              // Kulit (telinga/leher/pipi): lindungi rona kulit alami, hanya redam flare merah berlebih
-              const naturalMaxR = Math.min(255, Math.round(g * 1.30 + 15));
-              if (r > naturalMaxR) {
-                r = Math.round(r * (1 - spillFactor * 0.6) + naturalMaxR * (spillFactor * 0.6));
+              const targetB = Math.max(r, Math.round(g * 1.02));
+              b = Math.round(b * (1 - spillFactor) + targetB * spillFactor);
+              if (spillFactor >= 0.40) {
+                b = Math.min(b, maxRG + 2);
               }
             }
-          }
-
-          // D. De-fringing Latar Hijau
-          if (isGreenBg) {
-            const maxRB = Math.max(r, b);
-            if (g > maxRB) {
-              const excessG = g - maxRB;
-              g = Math.round(g - excessG * spillFactor * 0.94);
-            }
-          }
-
-          // E. De-fringing Latar Putih Terang / Overexposure Glow
-          if (isLightBg && pLum > 75 && pLum < 195) {
-            const isNeutralDark = Math.abs(r - g) < 22 && Math.abs(g - b) < 22;
-            if (isNeutralDark) {
-              const damp = 1.0 - (spillFactor * 0.22);
-              r = Math.round(r * damp);
-              g = Math.round(g * damp);
-              b = Math.round(b * damp);
-            }
-          }
-
-          // F. De-fringing Latar Kuning (Pas Foto Kuning Resmi)
-          if (isYellowBg) {
-            const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : false;
-            if (!isSkin) {
-              if (g > b + 15 && r > b + 25) {
-                const excessG = g - Math.max(b, Math.round(r * 0.72));
-                if (excessG > 0) {
-                  g = Math.round(g - excessG * spillFactor * 0.95);
-                }
+            // 2. Hilangkan sisa warna sian/teal (G dan B keduanya lebih tinggi dari R pada kain jas/rambut netral)
+            if (g > r + 4 && b > r + 4) {
+              const targetChroma = Math.round(r * 1.06 + 3);
+              const excessG = g - targetChroma;
+              const excessB = b - targetChroma;
+              g = Math.round(g - excessG * spillFactor * 0.96);
+              b = Math.round(b - excessB * spillFactor * 0.96);
+              if (spillFactor >= 0.40) {
+                g = Math.min(g, targetChroma + 3);
+                b = Math.min(b, targetChroma + 3);
               }
             }
+          } else if (pLum >= 110) {
+            // Kerah kemeja putih / pakaian terang (menghilangkan halo biru)
+            const maxChan = Math.max(r, g, b);
+            const targetR = Math.max(r, Math.round(maxChan * 0.96));
+            r = Math.round(r * (1 - weight) + targetR * weight);
+            b = Math.min(b, Math.max(r, g));
           }
-
-          cutoutSource[i] = r;
-          cutoutSource[i + 1] = g;
-          cutoutSource[i + 2] = b;
         }
+
+        // C. Decontamination Latar Merah Resmi (Pas Foto Merah)
+        if (isRedBg) {
+          const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : (r > g && g > b && r - b > 20);
+          const maxGB = Math.max(g, b);
+          if (!isSkin) {
+            // Tepi rambut, hijab, jas, kerah, bahu
+            if (r > maxGB) {
+              const excessR = r - maxGB;
+              r = Math.round(r - excessR * weight * 0.96);
+            }
+            // Kerah kemeja putih (menghilangkan semburat merah muda/pink pada kain putih)
+            if (g >= 110 && b >= 110 && Math.abs(g - b) < 26) {
+              const targetR = Math.round((g + b) * 0.5);
+              r = Math.round(r * (1 - weight) + targetR * weight);
+            }
+            // Rambut / kain gelap
+            if (pLum < 95) {
+              r = Math.min(r, Math.round(maxGB * 1.05));
+            }
+          } else {
+            // Kulit (telinga/leher/pipi): lindungi rona kulit alami, hanya redam flare merah berlebih
+            const naturalMaxR = Math.min(255, Math.round(g * 1.28 + 15));
+            if (r > naturalMaxR) {
+              r = Math.round(r * (1 - weight * 0.6) + naturalMaxR * (weight * 0.6));
+            }
+          }
+        }
+
+        // D. Decontamination Latar Hijau
+        if (isGreenBg) {
+          const maxRB = Math.max(r, b);
+          if (g > maxRB) {
+            const excessG = g - maxRB;
+            g = Math.round(g - excessG * weight * 0.96);
+          }
+        }
+
+        // E. Decontamination Latar Putih Terang / Overexposure Glow
+        if (isLightBg && pLum > 75 && pLum < 195) {
+          const isNeutralDark = Math.abs(r - g) < 22 && Math.abs(g - b) < 22;
+          if (isNeutralDark) {
+            const damp = 1.0 - (weight * 0.22);
+            r = Math.round(r * damp);
+            g = Math.round(g * damp);
+            b = Math.round(b * damp);
+          }
+        }
+
+        // F. Decontamination Latar Kuning (Pas Foto Kuning Resmi)
+        if (isYellowBg) {
+          const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : false;
+          if (!isSkin) {
+            if (g > b + 15 && r > b + 25) {
+              const excessG = g - Math.max(b, Math.round(r * 0.72));
+              if (excessG > 0) {
+                g = Math.round(g - excessG * weight * 0.95);
+              }
+            }
+          }
+        }
+
+        cutoutSource[i] = r;
+        cutoutSource[i + 1] = g;
+        cutoutSource[i + 2] = b;
       }
     }
 
