@@ -168,7 +168,8 @@ export class BackgroundEngine {
     const confidence = Math.min(99, Math.max(50, Math.round(100 - avgColorDeviation * 0.7)));
 
     let colorName = 'Netral';
-    if (meanR > meanG + 30 && meanR > meanB + 30) colorName = 'Merah';
+    if (meanR > meanB + 35 && meanG > meanB + 30 && Math.abs(meanR - meanG) < 55) colorName = 'Kuning';
+    else if (meanR > meanG + 30 && meanR > meanB + 30) colorName = 'Merah';
     else if (meanB > meanR + 25 && meanB > meanG + 15) colorName = 'Biru';
     else if (meanR > 210 && meanG > 210 && meanB > 210) colorName = 'Putih Terang';
     else if (meanR < 60 && meanG < 60 && meanB < 60) colorName = 'Gelap/Hitam';
@@ -350,6 +351,8 @@ export class BackgroundEngine {
     const isBlueBg = (bgB > bgR + 15 && bgB > bgG + 10) || (bgCb > 0.40 && bgCr < 0.32);
     const isRedBg = (bgR > bgG + 22 && bgR > bgB + 22) || (bgCr > 0.46 && bgCb < 0.30);
     const isGreenBg = (bgG > bgR + 18 && bgG > bgB + 18) || (bgCg > 0.44);
+    const isYellowBg = (bgR > bgB + 35 && bgG > bgB + 30 && Math.abs(bgR - bgG) < 55) ||
+                       (bgCr > 0.36 && bgCg > 0.36 && bgCb < 0.22);
 
     // 3. Sample Facial Skin Tone Reference (tight safe box in inner face)
     let skinSampleCount = 0, skinRSum = 0, skinGSum = 0, skinBSum = 0;
@@ -404,12 +407,13 @@ export class BackgroundEngine {
       }
 
       // 0. Dark Pixel Foreground Shield:
-      // In light or colored backdrops, dark pixels (hair, black hijab, dark tie, dark suit) are 100% subject!
+      // In light or colored backdrops, dark pixels (hair, black hijab, dark tie, dark suit, brown hat) are 100% subject!
       if (!isDarkBg) {
         const maxRGB = Math.max(r, g, b);
         const hasChromaBgDominance = (isBlueBg && (b - Math.max(r, g) >= 15)) ||
                                      (isRedBg && (r - Math.max(g, b) >= 20)) ||
-                                     (isGreenBg && (g - Math.max(r, b) >= 15));
+                                     (isGreenBg && (g - Math.max(r, b) >= 15)) ||
+                                     (isYellowBg && (r - b >= 45 && g - b >= 40));
         if (!hasChromaBgDominance) {
           if (maxRGB < 65 || (pLum < 70 && Math.abs(r - b) < 25 && Math.abs(r - g) < 25)) {
             return false;
@@ -456,6 +460,17 @@ export class BackgroundEngine {
         const greenDominance = g - Math.max(r, b);
         if (greenDominance >= 20 && g >= 55) {
           return true;
+        }
+        return false;
+      }
+
+      // 4. Studio Yellow Backdrop (Pas Foto Kuning Resmi)
+      if (isYellowBg) {
+        // Latar kuning studio memiliki dominasi kuning tinggi terhadap biru (G-B >= 45 dan R-B >= 55) dan B <= 80
+        if (g - b >= 45 && r - b >= 55 && b <= 80 && pLum >= 45) {
+          if (!this.isSkinTone(r, g, b, skinRef)) {
+            return true;
+          }
         }
         return false;
       }
@@ -513,37 +528,49 @@ export class BackgroundEngine {
       }
     }
 
-    // Landmark 2: Central Face, Eyes, Nose, Mouth and Inner Head Core
+    // Landmark 2: Central Face, Eyes, Nose, Mouth and Head/Hair Core
     // In formal pas foto framing, head and face are centered around (0.50 * width, 0.35 * height)
-    const faceLeft = Math.floor(width * 0.34);
-    const faceRight = Math.floor(width * 0.66);
-    const faceTop = Math.floor(height * 0.18);
+    const faceLeft = Math.floor(width * 0.36);
+    const faceRight = Math.floor(width * 0.64);
+    const faceTop = Math.floor(height * 0.16);
     const faceBottom = Math.floor(height * 0.48);
     for (let y = faceTop; y <= faceBottom; y++) {
       const rowOffset = y * width;
       for (let x = faceLeft; x <= faceRight; x++) {
         const pIdx = rowOffset + x;
-        classification[pIdx] = 2; // Protected head core
+        const i = pIdx * 4;
+        const r = srcData[i];
+        const g = srcData[i + 1];
+        const b = srcData[i + 2];
+
+        // Never protect clear colored backdrops (e.g. yellow, blue, red backdrop next to cheek/hat):
+        const isDefiniteColoredBg = (isBlueBg && (b - Math.max(r, g) >= 15)) ||
+                                    (isRedBg && (r - Math.max(g, b) >= 20)) ||
+                                    (isGreenBg && (g - Math.max(r, b) >= 15)) ||
+                                    (isYellowBg && (r - b >= 45 && g - b >= 40 && b <= 80));
+        if (isDefiniteColoredBg) {
+          continue;
+        }
+
+        classification[pIdx] = 2; // Protected head/face/hair core
       }
     }
 
-    // Landmark 3: Torso, Neck, Collar, Tie, Badges & Shoulders Core
-    // In formal pas foto framing, human shoulders start around y=44% and widen to occupy the lower area
-    for (let y = Math.floor(height * 0.44); y < height; y++) {
+    // Landmark 3: Central Torso Core Anchor (ONLY if verified NOT background)
+    for (let y = Math.floor(height * 0.46); y < height; y++) {
       const rowOffset = y * width;
-      const progress = (y - height * 0.44) / (height * 0.56); // 0.0 at neck to 1.0 at bottom
-      const halfW = (0.28 + progress * 0.26) * width;
+      const progress = (y - height * 0.46) / (height * 0.54);
+      const halfW = (0.24 + progress * 0.24) * width;
       const startX = Math.max(0, Math.floor(width * 0.50 - halfW));
       const endX = Math.min(width - 1, Math.floor(width * 0.50 + halfW));
 
       for (let x = startX; x <= endX; x++) {
         const pIdx = rowOffset + x;
-        // The central chest is ALWAYS protected (tie, badges, buttons, collar):
-        const isCentralChest = (x >= width * 0.32 && x <= width * 0.68);
-        if (!isCentralChest && (isBlueBg || isRedBg || isGreenBg) && isPixelBackground(x, y, pIdx)) {
+        // NEVER stamp background pixels as subject!
+        if (isPixelBackground(x, y, pIdx)) {
           continue;
         }
-        classification[pIdx] = 2; // Protected torso/clothing core
+        classification[pIdx] = 2;
       }
     }
 
@@ -578,7 +605,7 @@ export class BackgroundEngine {
 
     // 8. Flood Fill Propagation with Anatomical Edge Barriers
     // Threshold to stop at subject boundary:
-    const edgeThreshold = (isBlueBg || isRedBg) ? 18 : 12;
+    const edgeThreshold = (isBlueBg || isRedBg || isYellowBg) ? 18 : 12;
 
     while (qHead < qTail) {
       const curr = queue[qHead++];
@@ -648,12 +675,11 @@ export class BackgroundEngine {
       }
     }
 
-    // 10. Natural Non-Destructive Alpha Mask Construction:
-    // - Every subject pixel (classification === 2) is guaranteed 100% OPAQUE (mask = 1.0).
-    //   Zero transparency, zero erosion on face, hair, hijab, or clothing!
-    // - Background pixels (classification === 1) are 0.0.
-    // - Feathering is ONLY applied as smooth anti-aliasing on the exterior boundary pixels
-    //   (pixels classified as 1 that touch the subject contour) so edges are smooth without jaggedness.
+    // 10. Pure Subject Preservation Alpha Mask Construction:
+    // - Every background pixel (classification === 1) is STRICTLY 0.0 (prevents old background halo/fringe).
+    // - Every interior subject pixel (classification === 2) is GUARANTEED 100% OPAQUE (mask = 1.0).
+    // - On the immediate 1-pixel outer edge of the subject, apply clean edge anti-aliasing (0.90)
+    //   using the subject's own color to ensure smooth blending against the new background without color bleeding.
     const mask = new Float32Array(width * height);
 
     for (let i = 0; i < width * height; i++) {
@@ -661,30 +687,21 @@ export class BackgroundEngine {
     }
 
     if (settings.edgeFeather > 0) {
-      // Find boundary pixels and apply anti-aliasing only on the outer background rim touching the subject
       for (let y = 1; y < height - 1; y++) {
         const rowOffset = y * width;
         for (let x = 1; x < width - 1; x++) {
           const pIdx = rowOffset + x;
-          if (classification[pIdx] === 1) {
-            let hasFgNeighbor = false;
-            if (classification[pIdx - 1] === 2 || classification[pIdx + 1] === 2 ||
-                classification[pIdx - width] === 2 || classification[pIdx + width] === 2) {
-              hasFgNeighbor = true;
+          // Apply anti-aliasing ONLY on the subject's outermost border pixel (never on background!)
+          if (classification[pIdx] === 2) {
+            let hasBgNeighbor = false;
+            if (classification[pIdx - 1] === 1 || classification[pIdx + 1] === 1 ||
+                classification[pIdx - width] === 1 || classification[pIdx + width] === 1) {
+              hasBgNeighbor = true;
             }
 
-            if (hasFgNeighbor) {
-              // Outer rim anti-aliasing (never touches or erodes the subject interior)
-              const i = pIdx * 4;
-              const r = srcData[i];
-              const g = srcData[i + 1];
-              const b = srcData[i + 2];
-              const dr = r - bgR;
-              const dg = g - bgG;
-              const db = b - bgB;
-              const colorDist = Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 1.732;
-              const aaAlpha = Math.max(0.12, Math.min(0.35, (colorDist / Math.max(1, tolerance * 1.2)) * 0.35));
-              mask[pIdx] = aaAlpha;
+            if (hasBgNeighbor) {
+              // Smooth boundary transition on the subject's edge
+              mask[pIdx] = 0.90;
             }
           }
         }
@@ -745,6 +762,7 @@ export class BackgroundEngine {
       const isBlueBg = (bgB > bgR + 12 && bgB > bgG + 10);
       const isRedBg = (bgR > bgG + 16 && bgR > bgB + 16);
       const isGreenBg = (bgG > bgR + 14 && bgG > bgB + 14);
+      const isYellowBg = (bgR > bgB + 30 && bgG > bgB + 25 && Math.abs(bgR - bgG) < 55);
       const isLightBg = bgLum > 165;
 
       for (let y = 0; y < height; y++) {
@@ -846,6 +864,19 @@ export class BackgroundEngine {
               r = Math.round(r * damp);
               g = Math.round(g * damp);
               b = Math.round(b * damp);
+            }
+          }
+
+          // F. De-fringing Latar Kuning (Pas Foto Kuning Resmi)
+          if (isYellowBg) {
+            const isSkin = skinRef ? this.isSkinTone(r, g, b, skinRef) : false;
+            if (!isSkin) {
+              if (g > b + 15 && r > b + 25) {
+                const excessG = g - Math.max(b, Math.round(r * 0.72));
+                if (excessG > 0) {
+                  g = Math.round(g - excessG * spillFactor * 0.95);
+                }
+              }
             }
           }
 
