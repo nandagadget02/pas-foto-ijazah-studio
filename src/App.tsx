@@ -441,6 +441,12 @@ export default function App() {
       Math.abs(adjustments.exposureEV - initial.exposureEV) > 0.01 ||
       Math.abs(adjustments.contrast - initial.contrast) > 0.01 ||
       Math.abs(adjustments.shadows - initial.shadows) > 0.01 ||
+      (adjustments.satRed ?? 0) !== 0 ||
+      (adjustments.satYellow ?? 0) !== 0 ||
+      (adjustments.satGreen ?? 0) !== 0 ||
+      (adjustments.satCyan ?? 0) !== 0 ||
+      (adjustments.satBlue ?? 0) !== 0 ||
+      (adjustments.satMagenta ?? 0) !== 0 ||
       targetTone !== 'natural';
 
     if (isChanged) {

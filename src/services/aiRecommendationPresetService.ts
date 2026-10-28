@@ -46,6 +46,12 @@ export const SYSTEM_AI_PRESETS: AIRecommendationPreset[] = [
       saturation: 0,
       temperature: 0,
       tint: 0,
+      satRed: 0,
+      satYellow: 0,
+      satGreen: 0,
+      satCyan: 0,
+      satBlue: 0,
+      satMagenta: 0,
     },
   },
   {
@@ -76,6 +82,12 @@ export const SYSTEM_AI_PRESETS: AIRecommendationPreset[] = [
       saturation: 0,
       temperature: 0,
       tint: 0,
+      satRed: 0,
+      satYellow: 0,
+      satGreen: 0,
+      satCyan: 0,
+      satBlue: 0,
+      satMagenta: 0,
     },
   },
   {
@@ -106,6 +118,12 @@ export const SYSTEM_AI_PRESETS: AIRecommendationPreset[] = [
       saturation: 0,
       temperature: 0,
       tint: 0,
+      satRed: 0,
+      satYellow: 0,
+      satGreen: 0,
+      satCyan: 0,
+      satBlue: 0,
+      satMagenta: 0,
     },
   },
 ];
@@ -162,6 +180,12 @@ export class AIRecommendationPresetService {
       saturation: 0,
       temperature: Math.round(this.clamp(p.temperature, -25, 25, 0)),
       tint: Math.round(this.clamp(p.tint, -25, 25, 0)),
+      satRed: Math.round(this.clamp(p.satRed, -100, 100, 0)),
+      satYellow: Math.round(this.clamp(p.satYellow, -100, 100, 0)),
+      satGreen: Math.round(this.clamp(p.satGreen, -100, 100, 0)),
+      satCyan: Math.round(this.clamp(p.satCyan, -100, 100, 0)),
+      satBlue: Math.round(this.clamp(p.satBlue, -100, 100, 0)),
+      satMagenta: Math.round(this.clamp(p.satMagenta, -100, 100, 0)),
     };
   }
 

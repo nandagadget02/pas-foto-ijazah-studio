@@ -181,6 +181,13 @@ export interface AdjustmentParams {
   saturation: number; // -50 to +50
   temperature: number; // -25 to +25
   tint: number; // -25 to +25
+  // Selective Color Saturation (-100 to +100, default 0)
+  satRed?: number;
+  satYellow?: number;
+  satGreen?: number;
+  satCyan?: number;
+  satBlue?: number;
+  satMagenta?: number;
 }
 
 export interface OutputDimension {

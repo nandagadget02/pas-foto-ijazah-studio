@@ -43,6 +43,21 @@ export class ToneEngine {
     const temp = params.temperature;
     const tint = params.tint;
     const satFactor = 1 + params.saturation / 50;
+    // Selective Color Saturation parameters
+    const satReds = params.satRed || 0;
+    const satYellows = params.satYellow || 0;
+    const satGreens = params.satGreen || 0;
+    const satCyans = params.satCyan || 0;
+    const satBlues = params.satBlue || 0;
+    const satMagentas = params.satMagenta || 0;
+    const hasSelectiveSat = !isBW && (
+      satReds !== 0 ||
+      satYellows !== 0 ||
+      satGreens !== 0 ||
+      satCyans !== 0 ||
+      satBlues !== 0 ||
+      satMagentas !== 0
+    );
 
     // Precalculate tone lookup table (LUT) for basic 0..255 if applicable,
     // but highlights/shadows depend on local pixel luminance.
@@ -137,6 +152,82 @@ export class ToneEngine {
           g = curLum + satFactor * (g - curLum);
           b = curLum + satFactor * (b - curLum);
         }
+        // 7. Selective Color Saturation (Reds, Yellows, Greens, Cyans, Blues, Magentas)
+        if (hasSelectiveSat) {
+          const maxVal = Math.max(r, g, b);
+          const minVal = Math.min(r, g, b);
+          const chroma = maxVal - minVal;
+
+          if (chroma >= 1.0) {
+            let hue = 0;
+            if (maxVal === r) {
+              hue = ((g - b) / chroma) % 6;
+            } else if (maxVal === g) {
+              hue = (b - r) / chroma + 2;
+            } else {
+              hue = (r - g) / chroma + 4;
+            }
+            hue = hue * 60;
+            if (hue < 0) hue += 360;
+
+            // Interpolate saturation adjustment based on hue
+            // 0: Reds, 60: Yellows, 120: Greens, 180: Cyans, 240: Blues, 300: Magentas
+            let deltaSat = 0;
+            const sector = Math.floor(hue / 60); // 0 to 5
+            const t = (hue % 60) / 60; // 0.0 to 1.0
+            // Cosine blend for silky smooth transitions without color banding
+            const w = (1 - Math.cos(t * Math.PI)) * 0.5;
+
+            if (sector === 0) {
+              // Reds (0) to Yellows (60)
+              deltaSat = satReds * (1 - w) + satYellows * w;
+            } else if (sector === 1) {
+              // Yellows (60) to Greens (120)
+              deltaSat = satYellows * (1 - w) + satGreens * w;
+            } else if (sector === 2) {
+              // Greens (120) to Cyans (180)
+              deltaSat = satGreens * (1 - w) + satCyans * w;
+            } else if (sector === 3) {
+              // Cyans (180) to Blues (240)
+              deltaSat = satCyans * (1 - w) + satBlues * w;
+            } else if (sector === 4) {
+              // Blues (240) to Magentas (300)
+              deltaSat = satBlues * (1 - w) + satMagentas * w;
+            } else {
+              // Magentas (300) to Reds (360)
+              deltaSat = satMagentas * (1 - w) + satReds * w;
+            }
+
+            if (deltaSat !== 0) {
+              // Proportional skin tone protection (hue 5 to 50 with characteristic melanin/hemoglobin ratios)
+              if (r > g && g > b && (r - b) > 15 && r > 60 && hue >= 5 && hue <= 50) {
+                const hueCenterDist = Math.abs(hue - 25);
+                const skinProximity = Math.max(0, 1 - hueCenterDist / 25);
+                const satRatio = chroma / maxVal;
+                if (satRatio >= 0.12 && satRatio <= 0.68) {
+                  // Dampen selective shift by 65% on authentic skin tones to prevent unnatural discolouration
+                  deltaSat *= (1.0 - skinProximity * 0.65);
+                }
+              }
+
+              const curLum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+              const selectiveFactor = 1 + deltaSat / 100;
+              r = curLum + selectiveFactor * (r - curLum);
+              g = curLum + selectiveFactor * (g - curLum);
+              b = curLum + selectiveFactor * (b - curLum);
+
+              // Gamut clipping protection (scale towards luminance to preserve hue integrity)
+              const newMax = Math.max(r, g, b);
+              if (newMax > 255) {
+                const damp = 255 / newMax;
+                r = curLum + (r - curLum) * damp;
+                g = curLum + (g - curLum) * damp;
+                b = curLum + (b - curLum) * damp;
+              }
+            }
+          }
+        }
+
 
         data[i] = Math.round(Math.max(0, Math.min(255, r)));
         data[i + 1] = Math.round(Math.max(0, Math.min(255, g)));
