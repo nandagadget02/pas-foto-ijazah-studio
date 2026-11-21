@@ -1,7 +1,7 @@
 {
-  "name": "pas-foto-ijazah-studio-v3",
+  "name": "pas-foto-ijazah-studio-v4",
   "private": true,
-  "version": "3.0.0",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch server.ts",
