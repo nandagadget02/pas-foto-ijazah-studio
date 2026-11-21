@@ -145,12 +145,9 @@ export const DimensionAndCrop: React.FC<DimensionAndCropProps> = ({
       newWidth = newHeight * selectedDimension.aspectRatio;
     }
 
-    let newX = cropRect.x + deltaX;
-    let newY = cropRect.y + deltaY;
-
-    // Constrain to image boundaries
-    newX = Math.max(0, Math.min(imageMetadata.width - newWidth, newX));
-    newY = Math.max(0, Math.min(imageMetadata.height - newHeight, newY));
+    // Translasi manual X/Y: Bebas tanpa batasan buatan (Unlimited manual framing position)
+    const newX = cropRect.x + deltaX;
+    const newY = cropRect.y + deltaY;
 
     onChangeCropRect({
       x: Math.round(newX),

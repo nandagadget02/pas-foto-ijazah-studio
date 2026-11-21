@@ -164,64 +164,30 @@ export class ImageProcessor {
     const rotation = options.rotation || 0;
     const rad = (rotation * Math.PI) / 180;
 
+    ctx.save();
+    ctx.translate(outWidth / 2, outHeight / 2);
     if (rotation !== 0) {
-      ctx.save();
-      ctx.translate(outWidth / 2, outHeight / 2);
       ctx.rotate(rad);
-      if (!isHighResExport) {
-        // PREVIEW PATH: Draw from downsampled preview buffer for ultra-fast slider reactivity
-        const { source: previewSource, scale } = PreviewSourceCache.getOrCreatePreviewSource(sourceImage, 1200);
-        const pCenterX = (cropRect.x + cropRect.width / 2) * scale;
-        const pCenterY = (cropRect.y + cropRect.height / 2) * scale;
-        const pCropW = Math.max(1, cropRect.width * scale);
-        const pCropH = Math.max(1, cropRect.height * scale);
-
-        ctx.scale(outWidth / pCropW, outHeight / pCropH);
-        ctx.drawImage(previewSource, -pCenterX, -pCenterY);
-      } else {
-        // FULL-RESOLUTION EXPORT PATH: Draw directly from 100% full original sourceImage
-        const cropCenterX = cropRect.x + cropRect.width / 2;
-        const cropCenterY = cropRect.y + cropRect.height / 2;
-
-        ctx.scale(outWidth / cropRect.width, outHeight / cropRect.height);
-        ctx.drawImage(sourceImage, -cropCenterX, -cropCenterY);
-      }
-      ctx.restore();
-    } else {
-      if (!isHighResExport) {
-        // PREVIEW PATH: Draw from downsampled preview buffer for ultra-fast slider reactivity
-        const { source: previewSource, scale } = PreviewSourceCache.getOrCreatePreviewSource(sourceImage, 1200);
-        const srcX = Math.round(cropRect.x * scale);
-        const srcY = Math.round(cropRect.y * scale);
-        const srcW = Math.max(1, Math.round(cropRect.width * scale));
-        const srcH = Math.max(1, Math.round(cropRect.height * scale));
-
-        ctx.drawImage(
-          previewSource,
-          srcX,
-          srcY,
-          srcW,
-          srcH,
-          0,
-          0,
-          outWidth,
-          outHeight
-        );
-      } else {
-        // FULL-RESOLUTION EXPORT PATH: Draw directly from 100% full original sourceImage
-        ctx.drawImage(
-          sourceImage,
-          cropRect.x,
-          cropRect.y,
-          cropRect.width,
-          cropRect.height,
-          0,
-          0,
-          outWidth,
-          outHeight
-        );
-      }
     }
+    if (!isHighResExport) {
+      // PREVIEW PATH: Draw from downsampled preview buffer for ultra-fast slider reactivity
+      const { source: previewSource, scale } = PreviewSourceCache.getOrCreatePreviewSource(sourceImage, 1200);
+      const pCenterX = (cropRect.x + cropRect.width / 2) * scale;
+      const pCenterY = (cropRect.y + cropRect.height / 2) * scale;
+      const pCropW = Math.max(1, cropRect.width * scale);
+      const pCropH = Math.max(1, cropRect.height * scale);
+
+      ctx.scale(outWidth / pCropW, outHeight / pCropH);
+      ctx.drawImage(previewSource, -pCenterX, -pCenterY);
+    } else {
+      // FULL-RESOLUTION EXPORT PATH: Draw directly from 100% full original sourceImage
+      const cropCenterX = cropRect.x + cropRect.width / 2;
+      const cropCenterY = cropRect.y + cropRect.height / 2;
+
+      ctx.scale(outWidth / cropRect.width, outHeight / cropRect.height);
+      ctx.drawImage(sourceImage, -cropCenterX, -cropCenterY);
+    }
+    ctx.restore();
 
     // 2. CAPTURE ORIGINAL CROPPED DATA
     const rawCropData = ctx.getImageData(0, 0, outWidth, outHeight);

@@ -152,28 +152,16 @@ export const HasilPasFotoPanel: React.FC<HasilPasFotoPanelProps> = ({
         ctx.imageSmoothingQuality = 'high';
         ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
 
+        ctx.save();
+        ctx.translate(targetCanvas.width / 2, targetCanvas.height / 2);
         if (rotation !== 0) {
-          ctx.save();
-          ctx.translate(targetCanvas.width / 2, targetCanvas.height / 2);
           ctx.rotate((rotation * Math.PI) / 180);
-          const cropCenterX = cropRect.x + cropRect.width / 2;
-          const cropCenterY = cropRect.y + cropRect.height / 2;
-          ctx.scale(targetCanvas.width / cropRect.width, targetCanvas.height / cropRect.height);
-          ctx.drawImage(sourceImage, -cropCenterX, -cropCenterY);
-          ctx.restore();
-        } else {
-          ctx.drawImage(
-            sourceImage,
-            cropRect.x,
-            cropRect.y,
-            cropRect.width,
-            cropRect.height,
-            0,
-            0,
-            targetCanvas.width,
-            targetCanvas.height
-          );
         }
+        const cropCenterX = cropRect.x + cropRect.width / 2;
+        const cropCenterY = cropRect.y + cropRect.height / 2;
+        ctx.scale(targetCanvas.width / cropRect.width, targetCanvas.height / cropRect.height);
+        ctx.drawImage(sourceImage, -cropCenterX, -cropCenterY);
+        ctx.restore();
       }
     }
   }, [currentDisplayCanvas, sourceImage, cropRect, targetDimension, rotation]);
