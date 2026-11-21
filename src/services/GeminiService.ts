@@ -1,4 +1,4 @@
-import { PhotoAnalysisResult, AdjustmentParams, BatchErrorType } from '../types/analysis';
+import { PhotoAnalysisResult, AdjustmentParams, BatchErrorType, ApplicationAnalysisContext } from '../types/analysis';
 
 export interface GeminiApiErrorDetails {
   type: BatchErrorType;
@@ -22,6 +22,7 @@ export interface AnalyzePhotoOptions {
   signal?: AbortSignal;
   maxRetries?: number;
   cacheKey?: string;
+  appContext?: ApplicationAnalysisContext;
 }
 
 export class GeminiService {
@@ -80,7 +81,7 @@ export class GeminiService {
     model?: string,
     options: AnalyzePhotoOptions = {}
   ): Promise<PhotoAnalysisResult> {
-    const { timeoutMs = 25000, signal, maxRetries = 2, cacheKey } = options;
+    const { timeoutMs = 25000, signal, maxRetries = 2, cacheKey, appContext } = options;
 
     // 1. Check cache first
     if (cacheKey) {
@@ -124,14 +125,14 @@ export class GeminiService {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ imageBase64, mimeType, apiKey, model }),
+            body: JSON.stringify({ imageBase64, mimeType, apiKey, model, appContext }),
             signal: controller.signal,
           });
         } catch (fetchErr) {
           if (apiKey && apiKey.trim().length > 0) {
             clearTimeout(timer);
             if (signal) signal.removeEventListener('abort', onParentAbort);
-            return await this.directAnalyzePhoto(imageBase64, mimeType, apiKey, model, controller.signal);
+            return await this.directAnalyzePhoto(imageBase64, mimeType, apiKey, model, controller.signal, appContext);
           }
           throw fetchErr;
         }
@@ -141,7 +142,7 @@ export class GeminiService {
 
         if (!response.ok) {
           if ((response.status === 404 || response.status === 405) && apiKey && apiKey.trim().length > 0) {
-            return await this.directAnalyzePhoto(imageBase64, mimeType, apiKey, model, controller.signal);
+            return await this.directAnalyzePhoto(imageBase64, mimeType, apiKey, model, controller.signal, appContext);
           }
 
           const errData = await response.json().catch(() => ({}));
@@ -318,17 +319,27 @@ export class GeminiService {
     return Math.max(min, Math.min(max, val));
   }
 
+  private static snapVal(val: number, step: number): number {
+    if (typeof val !== 'number' || isNaN(val)) return 0;
+    if (step <= 0) return val;
+    const inv = 1 / step;
+    return Math.round(val * inv) / inv;
+  }
+
   private static sanitizeAnalysisResult(parsed: any, usedModel: string): PhotoAnalysisResult {
     const clamp = this.clampVal;
+    const snap = this.snapVal;
     const hasParams = Boolean(parsed && parsed.parameters);
 
     return {
       sourceMode: parsed?.sourceMode === 'grayscale' ? 'grayscale' : 'color',
       subject: {
         exposureEV: Number(
-          (hasParams
-            ? clamp(parsed.parameters?.exposure?.value, -1.0, 1.0, 0)
-            : clamp(parsed.subject?.exposureEV, -1.0, 1.0, 0)
+          snap(
+            hasParams
+              ? clamp(parsed.parameters?.exposure?.value, -1.0, 1.0, 0)
+              : clamp(parsed.subject?.exposureEV, -1.0, 1.0, 0),
+            0.05
           ).toFixed(2)
         ),
         brightness: Math.round(
@@ -412,11 +423,13 @@ export class GeminiService {
             : clamp(parsed.subject?.blackPoint, 0, 254, 0)
         ),
         midtonesGamma: Number(
-          (hasParams && parsed.parameters?.midtones_gamma?.value && parsed.parameters.midtones_gamma.value > 0
-            ? clamp(parsed.parameters.midtones_gamma.value, 0.1, 3.0, 1.0)
-            : parsed.subject?.midtonesGamma && parsed.subject.midtonesGamma > 0
-            ? clamp(parsed.subject.midtonesGamma, 0.1, 3.0, 1.0)
-            : 1.0
+          snap(
+            hasParams && parsed.parameters?.midtones_gamma?.value && parsed.parameters.midtones_gamma.value > 0
+              ? clamp(parsed.parameters.midtones_gamma.value, 0.1, 3.0, 1.0)
+              : parsed.subject?.midtonesGamma && parsed.subject.midtonesGamma > 0
+              ? clamp(parsed.subject.midtonesGamma, 0.1, 3.0, 1.0)
+              : 1.0,
+            0.05
           ).toFixed(2)
         ),
         whitePoint: Math.round(
@@ -579,7 +592,8 @@ export class GeminiService {
     mimeType: string,
     apiKey: string,
     model: string = 'gemini-2.5-flash-lite',
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    appContext?: ApplicationAnalysisContext
   ): Promise<PhotoAnalysisResult> {
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     let actualMime = mimeType || 'image/jpeg';
@@ -595,6 +609,29 @@ export class GeminiService {
         'gemini-1.5-flash',
       ])
     ).slice(0, 2);
+
+    let contextPromptText = '';
+    if (appContext && typeof appContext === 'object') {
+      const mode = appContext.editingMode || 'SUBJECT_ONLY';
+      const params = appContext.parameters || {};
+      const paramLines = Object.values(params)
+        .map(
+          (p: any) =>
+            `  * ${p.name || p.key}: current=${p.currentValue}, min=${p.min}, max=${p.max}, step=${p.step}`
+        )
+        .join('\n');
+
+      contextPromptText = `\n\nAPPLICATION CONTEXT (LIVE SLIDERS & BOUNDS):
+- Active Editing Mode: ${mode}
+- Available Controls, Current Values, and Slider Bounds:
+${paramLines}
+
+INSTRUCTION REGARDING SLIDER BOUNDS:
+1. You MUST NOT recommend values outside the min and max limits specified above.
+2. Every recommended numeric value MUST be an exact multiple of the corresponding step increment.
+3. If a parameter does not require adjustment, set adjust = false and set value = current value.
+4. If a parameter needs correction, set adjust = true and provide the exact value, visual justification reason, and confidence score.`;
+    }
 
     const promptText = `# MASTER SYSTEM PROMPT
 # GEMINI AI — INTELLIGENT PHOTO CORRECTION & PARAMETER OPTIMIZER
@@ -733,7 +770,7 @@ Use this structure:
                     },
                   },
                   {
-                    text: promptText,
+                    text: `${promptText}${contextPromptText}`,
                   },
                 ],
               },

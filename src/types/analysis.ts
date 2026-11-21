@@ -278,6 +278,231 @@ export interface AdjustmentParams {
   levelsOutWhite?: number; // 0 to 255, default 255
 }
 
+export interface SliderParameterContext {
+  key: string;
+  name: string;
+  currentValue: number;
+  min: number;
+  max: number;
+  step: number;
+}
+
+export interface ApplicationAnalysisContext {
+  editingMode: 'SUBJECT_ONLY' | 'SUBJECT_AND_BACKGROUND';
+  parameters: Record<string, SliderParameterContext>;
+}
+
+export function buildApplicationAnalysisContext(
+  adjustments: AdjustmentParams,
+  editTargetMode: 'subject_only' | 'all' = 'subject_only'
+): ApplicationAnalysisContext {
+  return {
+    editingMode: editTargetMode === 'subject_only' ? 'SUBJECT_ONLY' : 'SUBJECT_AND_BACKGROUND',
+    parameters: {
+      exposure: {
+        key: 'exposure',
+        name: 'Exposure (EV)',
+        currentValue: adjustments.exposureEV,
+        min: -1.0,
+        max: 1.0,
+        step: 0.05,
+      },
+      brightness: {
+        key: 'brightness',
+        name: 'Brightness / Midtone',
+        currentValue: adjustments.brightness,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      contrast: {
+        key: 'contrast',
+        name: 'Contrast',
+        currentValue: adjustments.contrast,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      highlights: {
+        key: 'highlights',
+        name: 'Highlights',
+        currentValue: adjustments.highlights,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      shadows: {
+        key: 'shadows',
+        name: 'Shadows',
+        currentValue: adjustments.shadows,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      whites: {
+        key: 'whites',
+        name: 'Whites',
+        currentValue: adjustments.whites,
+        min: -20,
+        max: 20,
+        step: 1,
+      },
+      blacks: {
+        key: 'blacks',
+        name: 'Blacks',
+        currentValue: adjustments.blacks,
+        min: -20,
+        max: 20,
+        step: 1,
+      },
+      black_point: {
+        key: 'black_point',
+        name: 'Black Point (Levels In Black)',
+        currentValue: adjustments.levelsInBlack ?? 0,
+        min: 0,
+        max: 254,
+        step: 1,
+      },
+      midtones_gamma: {
+        key: 'midtones_gamma',
+        name: 'Midtones / Gamma',
+        currentValue: adjustments.levelsGamma ?? 1.0,
+        min: 0.2,
+        max: 2.5,
+        step: 0.05,
+      },
+      white_point: {
+        key: 'white_point',
+        name: 'White Point (Levels In White)',
+        currentValue: adjustments.levelsInWhite ?? 255,
+        min: 1,
+        max: 255,
+        step: 1,
+      },
+      eye_detail: {
+        key: 'eye_detail',
+        name: 'Eye Detail',
+        currentValue: adjustments.eyeDetail,
+        min: 0,
+        max: 25,
+        step: 1,
+      },
+      face_detail: {
+        key: 'face_detail',
+        name: 'Face Detail',
+        currentValue: adjustments.faceDetail,
+        min: 0,
+        max: 25,
+        step: 1,
+      },
+      hair_hijab_detail: {
+        key: 'hair_hijab_detail',
+        name: 'Hair & Hijab Detail',
+        currentValue: adjustments.hairDetail,
+        min: 0,
+        max: 25,
+        step: 1,
+      },
+      sharpening: {
+        key: 'sharpening',
+        name: 'Sharpening',
+        currentValue: adjustments.sharpening,
+        min: 0,
+        max: 20,
+        step: 1,
+      },
+      noise_protection: {
+        key: 'noise_protection',
+        name: 'Noise Protection',
+        currentValue: adjustments.noiseProtection,
+        min: 0,
+        max: 20,
+        step: 1,
+      },
+      skin_protection: {
+        key: 'skin_protection',
+        name: 'Skin Protection',
+        currentValue: adjustments.skinProtection,
+        min: 0,
+        max: 25,
+        step: 1,
+      },
+      saturation: {
+        key: 'saturation',
+        name: 'Saturation',
+        currentValue: adjustments.saturation ?? 0,
+        min: -50,
+        max: 50,
+        step: 1,
+      },
+      temperature: {
+        key: 'temperature',
+        name: 'Temperature',
+        currentValue: adjustments.temperature,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      tint: {
+        key: 'tint',
+        name: 'Tint',
+        currentValue: adjustments.tint,
+        min: -25,
+        max: 25,
+        step: 1,
+      },
+      selective_reds: {
+        key: 'selective_reds',
+        name: 'Selective Color Reds',
+        currentValue: adjustments.satRed ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+      selective_yellows: {
+        key: 'selective_yellows',
+        name: 'Selective Color Yellows',
+        currentValue: adjustments.satYellow ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+      selective_greens: {
+        key: 'selective_greens',
+        name: 'Selective Color Greens',
+        currentValue: adjustments.satGreen ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+      selective_cyans: {
+        key: 'selective_cyans',
+        name: 'Selective Color Cyans',
+        currentValue: adjustments.satCyan ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+      selective_blues: {
+        key: 'selective_blues',
+        name: 'Selective Color Blues',
+        currentValue: adjustments.satBlue ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+      selective_magentas: {
+        key: 'selective_magentas',
+        name: 'Selective Color Magentas',
+        currentValue: adjustments.satMagenta ?? 0,
+        min: -100,
+        max: 100,
+        step: 1,
+      },
+    },
+  };
+}
+
 export interface OutputDimension {
   id: string;
   name: string;

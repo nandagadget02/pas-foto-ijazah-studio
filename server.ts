@@ -23,6 +23,14 @@ function clamp(val: unknown, min: number, max: number, fallback: number): number
   return Math.max(min, Math.min(max, val));
 }
 
+// Helper to snap values to the closest step increment
+function snapToStep(val: number, step: number): number {
+  if (typeof val !== 'number' || isNaN(val)) return 0;
+  if (step <= 0) return val;
+  const inv = 1 / step;
+  return Math.round(val * inv) / inv;
+}
+
 // Gemini AI Client setup
 function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
   const apiKey = (customApiKey && customApiKey.trim().length > 0) ? customApiKey.trim() : process.env.GEMINI_API_KEY;
@@ -110,7 +118,7 @@ app.post('/api/test-key', async (req, res) => {
 // API endpoint for photo analysis
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { imageBase64, mimeType, apiKey, model } = req.body;
+    const { imageBase64, mimeType, apiKey, model, appContext } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({ error: 'Data gambar (base64) diperlukan.' });
@@ -128,6 +136,29 @@ app.post('/api/analyze', async (req, res) => {
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     let actualMime = mimeType || 'image/jpeg';
     if (actualMime === 'image/jpg') actualMime = 'image/jpeg';
+
+    let contextPromptText = '';
+    if (appContext && typeof appContext === 'object') {
+      const mode = appContext.editingMode || 'SUBJECT_ONLY';
+      const params = appContext.parameters || {};
+      const paramLines = Object.values(params)
+        .map(
+          (p: any) =>
+            `  * ${p.name || p.key}: current=${p.currentValue}, min=${p.min}, max=${p.max}, step=${p.step}`
+        )
+        .join('\n');
+
+      contextPromptText = `\nAPPLICATION CONTEXT (LIVE SLIDERS & BOUNDS):
+- Active Editing Mode: ${mode}
+- Available Controls, Current Values, and Slider Bounds:
+${paramLines}
+
+INSTRUCTION REGARDING SLIDER BOUNDS:
+1. You MUST NOT recommend values outside the min and max limits specified above.
+2. Every recommended numeric value MUST be an exact multiple of the corresponding step increment.
+3. If a parameter does not require adjustment, set adjust = false and set value = current value.
+4. If a parameter needs correction, set adjust = true and provide the exact value, visual justification reason, and confidence score.`;
+    }
 
     const systemInstruction = `# MASTER SYSTEM PROMPT
 # GEMINI AI — INTELLIGENT PHOTO CORRECTION & PARAMETER OPTIMIZER
@@ -438,7 +469,7 @@ Use this structure:
                 },
               },
               {
-                text: 'Analisis foto pas foto ini secara cermat. Tentukan parameter koreksi non-generatif yang ideal untuk pas foto ijazah resmi standar nasional/internasional.',
+                text: `Analisis foto pas foto asli ini secara cermat menggunakan visual understanding. Tentukan parameter koreksi non-generatif yang ideal untuk pas foto ijazah resmi standar nasional/internasional.${contextPromptText}`,
               },
             ],
           },

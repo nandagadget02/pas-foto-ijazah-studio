@@ -55,6 +55,7 @@ import {
   PhotoAnalysisResult,
   PrinterCompensationSettings,
   TargetTone,
+  buildApplicationAnalysisContext,
 } from './types/analysis';
 import { GeminiService } from './services/GeminiService';
 import { ImageProcessor } from './image/ImageProcessor';
@@ -270,6 +271,7 @@ export default function App() {
         });
 
         const base64Data = await base64Promise;
+        const appContext = buildApplicationAnalysisContext(adjustments, editTargetMode);
         const result = await GeminiService.analyzePhoto(
           base64Data,
           file.type,
@@ -279,6 +281,7 @@ export default function App() {
             signal: controller.signal,
             timeoutMs: 25000,
             cacheKey: fingerprint,
+            appContext,
           }
         );
 
@@ -321,7 +324,7 @@ export default function App() {
         }
       }
     },
-    [apiKey, selectedModel, activeBatchItemId, analysisMethod]
+    [apiKey, selectedModel, activeBatchItemId, analysisMethod, adjustments, editTargetMode]
   );
 
   // Fallback Local Image Analysis (no API required)
@@ -374,39 +377,58 @@ export default function App() {
   const applyAIRecommendations = useCallback(() => {
     const activeRes = analysisMethod === 'gemini' ? geminiAnalysisResult : localAnalysisResult;
     if (!activeRes) return;
-    const { subject, recommendation } = activeRes;
+    const { subject, recommendation, geminiStructuredOutput } = activeRes;
 
-    // Save previous adjustments for Undo
-    setPreviousAdjustments(adjustments);
+    // Save previous adjustments for Undo (Urungkan)
+    setPreviousAdjustments({ ...adjustments });
+
+    const p = geminiStructuredOutput?.parameters;
+
+    // Rule: Terapkan hanya parameter yang ditandai adjust = true. Parameter adjust = false harus mempertahankan nilai sebelumnya.
+    const pick = (
+      adjustFlag: boolean | undefined,
+      recommendedVal: number | undefined,
+      currentVal: number
+    ): number => {
+      // Jika AI eksplisit menandai adjust = false, pertahankan nilai sebelumnya
+      if (adjustFlag === false) {
+        return currentVal;
+      }
+      return recommendedVal !== undefined ? recommendedVal : currentVal;
+    };
 
     const newAdjustments: AdjustmentParams = {
-      exposureEV: subject.exposureEV,
-      brightness: subject.brightness,
-      contrast: subject.contrast,
-      highlights: subject.highlights,
-      shadows: subject.shadows,
-      whites: subject.whites,
-      blacks: subject.blacks,
-      sharpening: subject.sharpening,
-      noiseProtection: subject.noiseProtection,
-      faceDetail: subject.faceDetail ?? 8,
-      eyeDetail: subject.eyeDetail ?? 10,
-      hairDetail: subject.hairDetail ?? 8,
-      skinProtection: subject.skinProtection ?? 12,
-      saturation: subject.saturation ?? 0,
-      temperature: recommendation.temperature,
-      tint: recommendation.tint,
-      satRed: subject.selectiveColors?.reds ?? 0,
-      satYellow: subject.selectiveColors?.yellows ?? 0,
-      satGreen: subject.selectiveColors?.greens ?? 0,
-      satCyan: subject.selectiveColors?.cyans ?? 0,
-      satBlue: subject.selectiveColors?.blues ?? 0,
-      satMagenta: subject.selectiveColors?.magentas ?? 0,
-      levelsInBlack: subject.blackPoint ?? 0,
-      levelsGamma: subject.midtonesGamma !== undefined && subject.midtonesGamma > 0 ? subject.midtonesGamma : 1.0,
-      levelsInWhite: subject.whitePoint ?? 255,
-      levelsOutBlack: 0,
-      levelsOutWhite: 255,
+      exposureEV: pick(p?.exposure?.adjust, subject.exposureEV, adjustments.exposureEV),
+      brightness: pick(p?.brightness?.adjust, subject.brightness, adjustments.brightness),
+      contrast: pick(p?.contrast?.adjust, subject.contrast, adjustments.contrast),
+      highlights: pick(p?.highlights?.adjust, subject.highlights, adjustments.highlights),
+      shadows: pick(p?.shadows?.adjust, subject.shadows, adjustments.shadows),
+      whites: pick(p?.whites?.adjust, subject.whites, adjustments.whites),
+      blacks: pick(p?.blacks?.adjust, subject.blacks, adjustments.blacks),
+      sharpening: pick(p?.sharpening?.adjust, subject.sharpening, adjustments.sharpening),
+      noiseProtection: pick(p?.noise_protection?.adjust, subject.noiseProtection, adjustments.noiseProtection),
+      faceDetail: pick(p?.face_detail?.adjust, subject.faceDetail, adjustments.faceDetail),
+      eyeDetail: pick(p?.eye_detail?.adjust, subject.eyeDetail, adjustments.eyeDetail),
+      hairDetail: pick(p?.hair_hijab_detail?.adjust, subject.hairDetail, adjustments.hairDetail),
+      skinProtection: pick(p?.skin_protection?.adjust, subject.skinProtection, adjustments.skinProtection),
+      saturation: pick(p?.saturation?.adjust, subject.saturation, adjustments.saturation ?? 0),
+      temperature: pick(p?.temperature?.adjust, recommendation.temperature, adjustments.temperature),
+      tint: pick(p?.tint?.adjust, recommendation.tint, adjustments.tint),
+      satRed: pick(undefined, subject.selectiveColors?.reds, adjustments.satRed ?? 0),
+      satYellow: pick(undefined, subject.selectiveColors?.yellows, adjustments.satYellow ?? 0),
+      satGreen: pick(undefined, subject.selectiveColors?.greens, adjustments.satGreen ?? 0),
+      satCyan: pick(undefined, subject.selectiveColors?.cyans, adjustments.satCyan ?? 0),
+      satBlue: pick(undefined, subject.selectiveColors?.blues, adjustments.satBlue ?? 0),
+      satMagenta: pick(undefined, subject.selectiveColors?.magentas, adjustments.satMagenta ?? 0),
+      levelsInBlack: pick(p?.black_point?.adjust, subject.blackPoint, adjustments.levelsInBlack ?? 0),
+      levelsGamma: pick(
+        p?.midtones_gamma?.adjust,
+        subject.midtonesGamma !== undefined && subject.midtonesGamma > 0 ? subject.midtonesGamma : undefined,
+        adjustments.levelsGamma ?? 1.0
+      ),
+      levelsInWhite: pick(p?.white_point?.adjust, subject.whitePoint, adjustments.levelsInWhite ?? 255),
+      levelsOutBlack: adjustments.levelsOutBlack ?? 0,
+      levelsOutWhite: adjustments.levelsOutWhite ?? 255,
     };
 
     setAdjustments(newAdjustments);
