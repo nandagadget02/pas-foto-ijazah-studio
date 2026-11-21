@@ -15,6 +15,20 @@ export interface SubjectAnalysis {
   detail: string;
   faceExposureCondition?: string;
   clothingCondition?: string;
+  // Levels
+  blackPoint?: number; // 0 to 254
+  midtonesGamma?: number; // 0.10 to 3.00
+  whitePoint?: number; // 1 to 255
+  // Saturation & Selective Colors
+  saturation?: number; // -50 to +50
+  selectiveColors?: {
+    reds?: number;
+    yellows?: number;
+    greens?: number;
+    cyans?: number;
+    blues?: number;
+    magentas?: number;
+  };
 }
 
 export interface BackgroundAnalysis {
@@ -40,6 +54,71 @@ export interface GlobalAnalysis {
   shadowClipRatio?: number;
 }
 
+export interface GeminiParameterItem {
+  value: number;
+  adjust: boolean;
+  reason?: string;
+  confidence?: number;
+}
+
+export interface GeminiSelectiveColorsItem {
+  reds?: number;
+  yellows?: number;
+  greens?: number;
+  cyans?: number;
+  blues?: number;
+  magentas?: number;
+}
+
+export interface GeminiMasterPromptOutput {
+  analysis_status?: string;
+  image_quality?: {
+    overall_assessment?: string;
+    exposure?: string;
+    contrast?: string;
+    skin_tone?: string;
+    highlights?: string;
+    shadows?: string;
+    sharpness?: string;
+    noise?: string;
+    white_balance?: string;
+    background?: string;
+  };
+  editing_mode?: string;
+  recommendation_profile?: string;
+  parameters?: {
+    exposure?: GeminiParameterItem;
+    brightness?: GeminiParameterItem;
+    contrast?: GeminiParameterItem;
+    highlights?: GeminiParameterItem;
+    shadows?: GeminiParameterItem;
+    whites?: GeminiParameterItem;
+    blacks?: GeminiParameterItem;
+    black_point?: GeminiParameterItem;
+    midtones_gamma?: GeminiParameterItem;
+    white_point?: GeminiParameterItem;
+    eye_detail?: GeminiParameterItem;
+    face_detail?: GeminiParameterItem;
+    hair_hijab_detail?: GeminiParameterItem;
+    sharpening?: GeminiParameterItem;
+    noise_protection?: GeminiParameterItem;
+    skin_protection?: GeminiParameterItem;
+    saturation?: GeminiParameterItem;
+    temperature?: GeminiParameterItem;
+    tint?: GeminiParameterItem;
+    selective_colors?: GeminiSelectiveColorsItem;
+  };
+  preservation_checks?: {
+    facial_identity?: boolean;
+    natural_skin_texture?: boolean;
+    original_clothing?: boolean;
+    original_background?: boolean;
+    non_generative_correction?: boolean;
+  };
+  recommendation_summary?: string;
+  warnings?: string[];
+}
+
 export interface PhotoAnalysisResult {
   sourceMode: 'color' | 'grayscale';
   subject: SubjectAnalysis;
@@ -50,7 +129,10 @@ export interface PhotoAnalysisResult {
     summary: string;
     temperature: number; // -25 to +25
     tint: number; // -25 to +25
+    recommendationProfile?: string;
+    warnings?: string[];
   };
+  geminiStructuredOutput?: GeminiMasterPromptOutput | any;
   analysisSource: 'gemini' | 'local';
   usedModel?: string;
 }

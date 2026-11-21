@@ -320,56 +320,197 @@ export class GeminiService {
 
   private static sanitizeAnalysisResult(parsed: any, usedModel: string): PhotoAnalysisResult {
     const clamp = this.clampVal;
+    const hasParams = Boolean(parsed && parsed.parameters);
+
     return {
       sourceMode: parsed?.sourceMode === 'grayscale' ? 'grayscale' : 'color',
       subject: {
-        exposureEV: Number(clamp(parsed?.subject?.exposureEV, -1.0, 1.0, 0).toFixed(2)),
-        brightness: Math.round(clamp(parsed?.subject?.brightness, -25, 25, 0)),
-        contrast: Math.round(clamp(parsed?.subject?.contrast, -25, 25, 0)),
-        highlights: Math.round(clamp(parsed?.subject?.highlights, -25, 25, 0)),
-        shadows: Math.round(clamp(parsed?.subject?.shadows, -25, 25, 0)),
-        whites: Math.round(clamp(parsed?.subject?.whites, -20, 20, 0)),
-        blacks: Math.round(clamp(parsed?.subject?.blacks, -20, 20, 0)),
-        sharpening: Math.round(clamp(parsed?.subject?.sharpening, 0, 20, 5)),
-        noiseProtection: Math.round(clamp(parsed?.subject?.noiseProtection, 0, 20, 6)),
-        faceDetail: Math.round(clamp(parsed?.subject?.faceDetail, 0, 25, 8)),
-        eyeDetail: Math.round(clamp(parsed?.subject?.eyeDetail, 0, 25, 10)),
-        hairDetail: Math.round(clamp(parsed?.subject?.hairDetail, 0, 25, 8)),
-        skinProtection: Math.round(clamp(parsed?.subject?.skinProtection, 0, 25, 12)),
-        detail: parsed?.subject?.detail || 'Detail wajah dan pakaian terdeteksi normal.',
-        faceExposureCondition: parsed?.subject?.faceExposureCondition || 'Pencahayaan wajah memadai',
-        clothingCondition: parsed?.subject?.clothingCondition || 'Pakaian rapi',
+        exposureEV: Number(
+          (hasParams
+            ? clamp(parsed.parameters?.exposure?.value, -1.0, 1.0, 0)
+            : clamp(parsed.subject?.exposureEV, -1.0, 1.0, 0)
+          ).toFixed(2)
+        ),
+        brightness: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.brightness?.value, -25, 25, 0)
+            : clamp(parsed.subject?.brightness, -25, 25, 0)
+        ),
+        contrast: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.contrast?.value, -25, 25, 0)
+            : clamp(parsed.subject?.contrast, -25, 25, 0)
+        ),
+        highlights: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.highlights?.value, -25, 25, 0)
+            : clamp(parsed.subject?.highlights, -25, 25, 0)
+        ),
+        shadows: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.shadows?.value, -25, 25, 0)
+            : clamp(parsed.subject?.shadows, -25, 25, 0)
+        ),
+        whites: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.whites?.value, -20, 20, 0)
+            : clamp(parsed.subject?.whites, -20, 20, 0)
+        ),
+        blacks: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.blacks?.value, -20, 20, 0)
+            : clamp(parsed.subject?.blacks, -20, 20, 0)
+        ),
+        sharpening: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.sharpening?.value, 0, 20, 5)
+            : clamp(parsed.subject?.sharpening, 0, 20, 5)
+        ),
+        noiseProtection: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.noise_protection?.value, 0, 20, 6)
+            : clamp(parsed.subject?.noiseProtection, 0, 20, 6)
+        ),
+        faceDetail: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.face_detail?.value, 0, 25, 8)
+            : clamp(parsed.subject?.faceDetail, 0, 25, 8)
+        ),
+        eyeDetail: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.eye_detail?.value, 0, 25, 10)
+            : clamp(parsed.subject?.eyeDetail, 0, 25, 10)
+        ),
+        hairDetail: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.hair_hijab_detail?.value, 0, 25, 8)
+            : clamp(parsed.subject?.hairDetail, 0, 25, 8)
+        ),
+        skinProtection: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.skin_protection?.value, 0, 25, 12)
+            : clamp(parsed.subject?.skinProtection, 0, 25, 12)
+        ),
+        detail:
+          parsed.parameters?.face_detail?.reason ||
+          parsed.subject?.detail ||
+          parsed.image_quality?.skin_tone ||
+          parsed.recommendation_summary ||
+          'Detail wajah dan pakaian terdeteksi normal.',
+        faceExposureCondition:
+          parsed.image_quality?.exposure ||
+          parsed.parameters?.exposure?.reason ||
+          parsed.subject?.faceExposureCondition ||
+          'Pencahayaan wajah memadai',
+        clothingCondition:
+          parsed.parameters?.shadows?.reason ||
+          parsed.subject?.clothingCondition ||
+          'Pakaian rapi',
+        blackPoint: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.black_point?.value, 0, 254, 0)
+            : clamp(parsed.subject?.blackPoint, 0, 254, 0)
+        ),
+        midtonesGamma: Number(
+          (hasParams && parsed.parameters?.midtones_gamma?.value && parsed.parameters.midtones_gamma.value > 0
+            ? clamp(parsed.parameters.midtones_gamma.value, 0.1, 3.0, 1.0)
+            : parsed.subject?.midtonesGamma && parsed.subject.midtonesGamma > 0
+            ? clamp(parsed.subject.midtonesGamma, 0.1, 3.0, 1.0)
+            : 1.0
+          ).toFixed(2)
+        ),
+        whitePoint: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.white_point?.value, 1, 255, 255)
+            : clamp(parsed.subject?.whitePoint, 1, 255, 255)
+        ),
+        saturation: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.saturation?.value, -50, 50, 0)
+            : clamp(parsed.subject?.saturation, -50, 50, 0)
+        ),
+        selectiveColors: {
+          reds: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.reds, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.reds, -100, 100, 0)
+          ),
+          yellows: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.yellows, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.yellows, -100, 100, 0)
+          ),
+          greens: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.greens, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.greens, -100, 100, 0)
+          ),
+          cyans: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.cyans, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.cyans, -100, 100, 0)
+          ),
+          blues: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.blues, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.blues, -100, 100, 0)
+          ),
+          magentas: Math.round(
+            hasParams
+              ? clamp(parsed.parameters?.selective_colors?.magentas, -100, 100, 0)
+              : clamp(parsed.subject?.selectiveColors?.magentas, -100, 100, 0)
+          ),
+        },
       },
       background: {
-        tone: ['terang', 'sedang', 'gelap'].includes(parsed?.background?.tone)
+        tone: ['terang', 'sedang', 'gelap'].includes(parsed.background?.tone)
           ? parsed.background.tone
           : 'sedang',
-        uniformity: ['polos', 'gradasi', 'kompleks'].includes(parsed?.background?.uniformity)
+        uniformity: ['polos', 'gradasi', 'kompleks'].includes(parsed.background?.uniformity)
           ? parsed.background.uniformity
           : 'polos',
-        colorCast: parsed?.background?.colorCast || 'Netral',
-        segmentationConfidence: Math.round(clamp(parsed?.background?.segmentationConfidence, 0, 100, 85)),
-        isSafeToPreserve: Boolean(parsed?.background?.isSafeToPreserve),
-        hasComplexObjects: Boolean(parsed?.background?.hasComplexObjects),
-        notes: parsed?.background?.notes || '',
+        colorCast: parsed.background?.colorCast || parsed.image_quality?.white_balance || 'Netral',
+        segmentationConfidence: Math.round(
+          clamp(parsed.background?.segmentationConfidence, 0, 100, 85)
+        ),
+        isSafeToPreserve:
+          parsed.preservation_checks?.original_background !== undefined
+            ? Boolean(parsed.preservation_checks.original_background)
+            : Boolean(parsed.background?.isSafeToPreserve ?? true),
+        hasComplexObjects: Boolean(parsed.background?.hasComplexObjects),
+        notes: parsed.background?.notes || parsed.image_quality?.background || '',
       },
       global: {
-        exposure: parsed?.global?.exposure || 'Normal',
-        contrast: parsed?.global?.contrast || 'Standar',
-        sharpness: parsed?.global?.sharpness || 'Cukup Tajam',
-        noise: parsed?.global?.noise || 'Rendah',
-        clipping: parsed?.global?.clipping || 'Tidak Terdeteksi',
-        dynamicRange: parsed?.global?.dynamicRange || 'Standar',
-        aspectRatio: parsed?.global?.aspectRatio || '3:4',
+        exposure: parsed.global?.exposure || parsed.image_quality?.exposure || 'Normal',
+        contrast: parsed.global?.contrast || parsed.image_quality?.contrast || 'Standar',
+        sharpness: parsed.global?.sharpness || parsed.image_quality?.sharpness || 'Cukup Tajam',
+        noise: parsed.global?.noise || parsed.image_quality?.noise || 'Rendah',
+        clipping: parsed.global?.clipping || parsed.image_quality?.highlights || 'Tidak Terdeteksi',
+        dynamicRange: parsed.global?.dynamicRange || 'Standar',
+        aspectRatio: parsed.global?.aspectRatio || '3:4',
       },
       recommendation: {
-        targetTone: ['natural', 'brighter', 'softer'].includes(parsed?.recommendation?.targetTone)
+        targetTone: ['natural', 'brighter', 'softer'].includes(parsed.recommendation?.targetTone)
           ? parsed.recommendation.targetTone
           : 'natural',
-        summary: parsed?.recommendation?.summary || 'Terapkan koreksi kontras seimbang dan pemulihan shadow.',
-        temperature: Math.round(clamp(parsed?.recommendation?.temperature, -25, 25, 0)),
-        tint: Math.round(clamp(parsed?.recommendation?.tint, -25, 25, 0)),
+        summary:
+          parsed.recommendation_summary ||
+          parsed.recommendation?.summary ||
+          'Terapkan koreksi kontras seimbang dan pemulihan shadow.',
+        temperature: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.temperature?.value, -25, 25, 0)
+            : clamp(parsed.recommendation?.temperature, -25, 25, 0)
+        ),
+        tint: Math.round(
+          hasParams
+            ? clamp(parsed.parameters?.tint?.value, -25, 25, 0)
+            : clamp(parsed.recommendation?.tint, -25, 25, 0)
+        ),
+        recommendationProfile: parsed.recommendation_profile || 'NATURAL_ID_PHOTO',
+        warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
       },
+      geminiStructuredOutput: parsed,
       analysisSource: 'gemini',
       usedModel: usedModel,
     };
@@ -455,53 +596,119 @@ export class GeminiService {
       ])
     ).slice(0, 2);
 
-    const promptText = `Anda adalah Master Photo Analyzer untuk PAS FOTO IJAZAH & DOKUMEN RESMI INDONESIA (Standar Dikti, Kemenag, Sekolah Kedinasan, Paspor, Dokumen Akreditasi).
-TUGAS: Analisis foto dan rekomendasikan parameter koreksi tonal non-generative.
-FORMAT OUTPUT WAJIB: JSON murni tanpa markdown/backticks sesuai struktur berikut:
+    const promptText = `# MASTER SYSTEM PROMPT
+# GEMINI AI — INTELLIGENT PHOTO CORRECTION & PARAMETER OPTIMIZER
+## PAS FOTO IJAZAH STUDIO
+
+### 1. ROLE
+You are an expert professional photo retoucher, portrait photography analyst, color correction specialist, skin tone preservation specialist, and professional ID/passport photograph enhancement consultant.
+Your task is to analyze an uploaded original photograph and generate precise, image-specific correction parameters for the application's existing Manual Adjustment & Fine Tuning controls.
+You must analyze the actual uploaded image using visual understanding capabilities. Do not provide generic presets. Every recommendation must be based on the visible characteristics of the uploaded photograph.
+
+### 2. PRIMARY OBJECTIVE
+Analyze the original photograph and recommend optimal correction values for:
+A. Basic Tonal Adjustments: Exposure (EV), Brightness, Contrast, Highlights, Shadows, Whites, Blacks
+B. Levels: Black Point, Midtones / Gamma, White Point
+C. Smart Detail Sharpening: Eye Detail, Face Detail, Hair & Hijab Detail, Sharpening, Noise Protection, Skin Protection
+D. Color & White Balance: Saturation, Temperature, Tint
+E. Selective Color Saturation: Reds, Yellows, Greens, Cyans, Blues, Magentas
+
+### 3. IMAGE ANALYSIS PROCESS
+STEP 1 — ORIGINAL IMAGE DIAGNOSIS: Analyze overall exposure and brightness, facial illumination, highlight clipping and shadow details, skin tone and color consistency, contrast distribution, hair and clothing details, background color and uniformity, noise, grain, and image softness, facial detail and eye sharpness, white balance and color cast.
+STEP 2 — SUBJECT ANALYSIS: Identify visible characteristics of face, eyes and eyebrows, nose and lips, skin texture, hair or hijab, clothing. Determine which areas need correction and which areas should remain unchanged.
+STEP 3 — CORRECTION STRATEGY: Choose the minimum necessary correction. Prioritize natural skin appearance, preservation of original facial identity, accurate skin color, balanced exposure, preserved facial texture, clear eye and hair details, natural clothing details, original background preservation. Do not increase every parameter automatically. If a parameter is already optimal, recommend 0 or retain its current value.
+
+### 4. PARAMETER RECOMMENDATION RULES
+- EXPOSURE: Adjust only when the image requires overall exposure correction (-1.0 to 1.0 EV).
+- BRIGHTNESS: Adjust facial midtone brightness without unnecessarily washing out the skin (-25 to 25).
+- CONTRAST: Maintain natural facial tonal transitions (-25 to 25).
+- HIGHLIGHTS: Reduce excessive bright areas while preserving natural skin highlights (-25 to 25).
+- SHADOWS: Recover important dark details, especially black clothing and hair (-25 to 25).
+- WHITES: Preserve white details without clipping (-20 to 20).
+- BLACKS: Maintain natural black depth without destroying shadow details (-20 to 20).
+- BLACK POINT: Preserve dark tonal information (0 to 254, default 0).
+- MIDTONES / GAMMA: Adjust midtone balance for natural facial brightness (0.10 to 3.00, default 1.0).
+- WHITE POINT: Maintain appropriate maximum tonal brightness (1 to 255, default 255).
+- EYE DETAIL: Enhance existing eye details without changing eye shape or identity (0 to 25, default 10).
+- FACE DETAIL: Improve existing facial clarity without creating artificial facial features (0 to 25, default 8).
+- HAIR & HIJAB DETAIL: Enhance existing texture without inventing strands or changing hair/hijab structure (0 to 25, default 8).
+- SHARPENING: Apply controlled sharpening without halos or excessive edge artifacts (0 to 20, default 5).
+- NOISE PROTECTION: Reduce visible noise while retaining authentic texture (0 to 20, default 6).
+- SKIN PROTECTION: Prevent excessive sharpening, smoothing, and artificial skin texture (0 to 25, default 12).
+- SATURATION: Maintain realistic skin and background colors (-50 to 50, default 0).
+- TEMPERATURE: Correct visible warm or cool color casts (-25 to 25, default 0).
+- TINT: Correct green or magenta color casts only when necessary (-25 to 25, default 0).
+- SELECTIVE COLOR: Modify individual color channels (-100 to 100) only when an actual color problem is detected (reds, yellows, greens, cyans, blues, magentas).
+
+### 5. SUBJECT ONLY MODE
+When editing mode is SUBJECT ONLY: Recommendations must target the subject only. Preserve original background appearance. Do not recommend background color changes. Prioritize face, skin, hair/hijab, and clothing.
+
+### 6. IDENTITY PRESERVATION — ABSOLUTE RULE
+The original photograph is the source of truth. Never recommend operations that require face regeneration, face replacement, facial restructuring, eye shape modification, nose/lip reshaping, artificial skin reconstruction, body reshaping, clothing replacement, or pose modification. This application performs non-generative pixel adjustments.
+
+### 7. PARAMETER RANGE VALIDATION
+Respect each parameter's permitted range and step increments. Return 0 or current default when no correction is necessary.
+
+### 8. RECOMMENDATION CONFIDENCE
+For every recommendation provide: recommended value, adjust (boolean), visual justification reason, confidence score (0 to 100).
+
+### 9. OUTPUT FORMAT — STRICT JSON
+Return valid JSON only, without Markdown fences or commentary.
+Use this structure:
 {
-  "sourceMode": "color",
-  "subject": {
-    "exposureEV": 0.0,
-    "brightness": 0,
-    "contrast": 0,
-    "highlights": 0,
-    "shadows": 0,
-    "whites": 0,
-    "blacks": 0,
-    "sharpening": 6,
-    "noiseProtection": 6,
-    "faceDetail": 8,
-    "eyeDetail": 10,
-    "hairDetail": 8,
-    "skinProtection": 12,
-    "detail": "Kondisi wajah dan pakaian",
-    "faceExposureCondition": "Normal",
-    "clothingCondition": "Rapi"
+  "analysis_status": "success",
+  "image_quality": {
+    "overall_assessment": "",
+    "exposure": "",
+    "contrast": "",
+    "skin_tone": "",
+    "highlights": "",
+    "shadows": "",
+    "sharpness": "",
+    "noise": "",
+    "white_balance": "",
+    "background": ""
   },
-  "background": {
-    "tone": "sedang",
-    "uniformity": "polos",
-    "colorCast": "Netral",
-    "segmentationConfidence": 85,
-    "isSafeToPreserve": true,
-    "hasComplexObjects": false,
-    "notes": "Catatan latar"
+  "editing_mode": "SUBJECT_ONLY",
+  "recommendation_profile": "NATURAL_ID_PHOTO",
+  "parameters": {
+    "exposure": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "brightness": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "contrast": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "highlights": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "shadows": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "whites": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "blacks": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "black_point": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "midtones_gamma": { "value": 1.0, "adjust": true, "reason": "", "confidence": 95 },
+    "white_point": { "value": 255, "adjust": false, "reason": "", "confidence": 95 },
+    "eye_detail": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "face_detail": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "hair_hijab_detail": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "sharpening": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "noise_protection": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "skin_protection": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "saturation": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "temperature": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "tint": { "value": 0, "adjust": true, "reason": "", "confidence": 95 },
+    "selective_colors": {
+      "reds": 0,
+      "yellows": 0,
+      "greens": 0,
+      "cyans": 0,
+      "blues": 0,
+      "magentas": 0
+    }
   },
-  "global": {
-    "exposure": "Normal",
-    "contrast": "Standar",
-    "sharpness": "Tajam",
-    "noise": "Rendah",
-    "clipping": "Aman",
-    "dynamicRange": "Standar",
-    "aspectRatio": "3:4"
+  "preservation_checks": {
+    "facial_identity": true,
+    "natural_skin_texture": true,
+    "original_clothing": true,
+    "original_background": true,
+    "non_generative_correction": true
   },
-  "recommendation": {
-    "targetTone": "natural",
-    "summary": "Ringkasan rekomendasi",
-    "temperature": 0,
-    "tint": 0
-  }
+  "recommendation_summary": "",
+  "warnings": []
 }`;
 
     let lastError = '';

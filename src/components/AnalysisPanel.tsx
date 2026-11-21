@@ -117,6 +117,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
             <span className="text-xs text-slate-400 font-mono">
               Mode Asli: {analysis.sourceMode.toUpperCase()}
             </span>
+            {recommendation.recommendationProfile && (
+              <span className="text-xs font-mono font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                Profil: {recommendation.recommendationProfile}
+              </span>
+            )}
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white mt-2">
             Rekomendasi Parameter Ijazah Resmi
@@ -135,6 +140,17 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           TERAPKAN REKOMENDASI {analysis.analysisSource === 'gemini' ? 'AI' : 'LOKAL'}
         </button>
       </div>
+
+      {/* Warnings / Observasi Khusus */}
+      {recommendation.warnings && recommendation.warnings.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+          <div>
+            <span className="font-semibold text-amber-300">Catatan Evaluasi AI: </span>
+            {recommendation.warnings.join(' • ')}
+          </div>
+        </div>
+      )}
 
       {/* 3 Columns: Subjek, Background, Global */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -213,6 +229,22 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                   +{subject.skinProtection ?? 12} / 25
                 </span>
               </div>
+              {(subject.blackPoint !== undefined || subject.midtonesGamma !== undefined || subject.whitePoint !== undefined) && (
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400">Levels (B / Gamma / W):</span>
+                  <span className="text-violet-300 font-mono font-semibold">
+                    {subject.blackPoint ?? 0} / {subject.midtonesGamma ?? 1.0} / {subject.whitePoint ?? 255}
+                  </span>
+                </div>
+              )}
+              {subject.saturation !== undefined && subject.saturation !== 0 && (
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400">Saturasi Global:</span>
+                  <span className="text-slate-200 font-mono font-semibold">
+                    {subject.saturation > 0 ? `+${subject.saturation}` : subject.saturation}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
