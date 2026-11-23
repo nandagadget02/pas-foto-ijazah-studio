@@ -4,6 +4,7 @@ import {
   BackgroundSettings,
   BackgroundType,
   BackgroundRemovalMode,
+  DEFAULT_BG_REMOVAL_MODE,
   DiagnosticPreviewMode,
   BatchPhotoItem,
   CropRect,
@@ -57,6 +58,7 @@ export class BatchProcessingService {
     options?: {
       selectedDimension?: OutputDimension;
       framingSettings?: FramingSettings;
+      bgRemovalMode?: BackgroundRemovalMode;
     }
   ): Promise<BatchPhotoItem> {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -120,7 +122,7 @@ export class BatchProcessingService {
       cropRect: initialCrop,
       framingSettings: { ...framing },
       faceSharpenSettings: { ...DEFAULT_FACE_SHARPEN_SETTINGS },
-      bgRemovalMode: hasTrans ? 'skip' : 'remove',
+      bgRemovalMode: options?.bgRemovalMode || DEFAULT_BG_REMOVAL_MODE,
       selectedDimension: targetDim,
     };
   }
@@ -262,7 +264,7 @@ export class BatchProcessingService {
       mode: effectiveMode,
       targetTone: effectiveTone,
       backgroundType: item.bgType || options.bgType,
-      bgRemovalMode: item.bgRemovalMode || options.bgRemovalMode || 'remove',
+      bgRemovalMode: item.bgRemovalMode || options.bgRemovalMode || DEFAULT_BG_REMOVAL_MODE,
       customBgImage: options.customBgImage,
       bgSettings: item.bgSettings || options.bgSettings,
       framingSettings: framing,
@@ -423,7 +425,7 @@ export class BatchProcessingService {
         mode: itemMode,
         targetTone: itemTone,
         backgroundType: item.bgType || options.bgType || 'preserve',
-        bgRemovalMode: item.bgRemovalMode || options.bgRemovalMode || 'remove',
+        bgRemovalMode: item.bgRemovalMode || options.bgRemovalMode || DEFAULT_BG_REMOVAL_MODE,
         customBgImage: options.customBgImage,
         bgSettings: item.bgSettings || options.bgSettings || DEFAULT_BG_SETTINGS,
         framingSettings: framing,

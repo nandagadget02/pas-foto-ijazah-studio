@@ -147,6 +147,8 @@ export type TargetTone = 'natural' | 'brighter' | 'softer';
 
 export type BackgroundRemovalMode = 'remove' | 'skip'; // 'remove' = Hapus Background, 'skip' = Jangan Hapus Background
 
+export const DEFAULT_BG_REMOVAL_MODE: BackgroundRemovalMode = 'skip'; // Default: Jangan Hapus Background
+
 export type BackgroundType =
   | 'preserve'
   | 'red'

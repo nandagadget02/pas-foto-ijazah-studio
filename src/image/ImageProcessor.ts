@@ -29,7 +29,7 @@ export interface ProcessOptions {
   mode: PhotoMode;
   targetTone: TargetTone;
   backgroundType: BackgroundType;
-  bgRemovalMode?: BackgroundRemovalMode; // 'remove' (default / AI segment) | 'skip' (pass-through / pre-transparent PNG)
+  bgRemovalMode?: BackgroundRemovalMode; // 'skip' (default: Jangan Hapus Background) | 'remove' (Hapus Background)
   customBgImage?: HTMLImageElement | null;
   bgSettings?: BackgroundSettings;
   targetDimension: OutputDimension;
@@ -192,7 +192,7 @@ export class ImageProcessor {
     // 2. CAPTURE ORIGINAL CROPPED DATA
     const rawCropData = ctx.getImageData(0, 0, outWidth, outHeight);
 
-    const isSkipBgRemoval = options.bgRemovalMode === 'skip';
+    const isSkipBgRemoval = (options.bgRemovalMode ?? 'skip') === 'skip';
     let segResult: SegmentationResult | undefined = undefined;
     let computedMask: Float32Array | undefined = undefined;
 

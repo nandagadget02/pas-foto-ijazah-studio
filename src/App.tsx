@@ -33,6 +33,7 @@ import {
   AdjustmentParams,
   AnalysisMethod,
   BackgroundRemovalMode,
+  DEFAULT_BG_REMOVAL_MODE,
   BackgroundSettings,
   BackgroundType,
   BatchErrorType,
@@ -144,7 +145,7 @@ export default function App() {
 
   // 5. Background State
   const [bgType, setBgType] = useState<BackgroundType>('preserve'); // Default Pertahankan
-  const [bgRemovalMode, setBgRemovalMode] = useState<BackgroundRemovalMode>('remove'); // 'remove' = Hapus Background, 'skip' = Jangan Hapus Background
+  const [bgRemovalMode, setBgRemovalMode] = useState<BackgroundRemovalMode>('skip'); // Default: Jangan Hapus Background ('skip')
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
   const [customBgPreviewUrl, setCustomBgPreviewUrl] = useState<string | null>(null);
   const [bgSettings, setBgSettings] = useState<BackgroundSettings>(DEFAULT_BG_SETTINGS);
@@ -844,7 +845,7 @@ export default function App() {
       // Isolasi State: Pulihkan pengaturan individual foto terpilih atau reset ke default bersih (Mencegah Leaking antar foto)
       const activeBgSettings = item.bgSettings ? { ...item.bgSettings } : DEFAULT_BG_SETTINGS;
       const activeBgType = item.bgType || 'preserve';
-      const activeBgRemoval = item.bgRemovalMode || (item.metadata?.hasTransparency ? 'skip' : 'remove');
+      const activeBgRemoval = item.bgRemovalMode || 'skip';
       setBgSettings(activeBgSettings);
       setBgType(activeBgType);
       setBgRemovalMode(activeBgRemoval);
@@ -948,7 +949,7 @@ export default function App() {
             mode: activeMode,
             targetTone: activeTone,
             backgroundType: activeBgType,
-            bgRemovalMode: item.bgRemovalMode || (item.metadata?.hasTransparency ? 'skip' : 'remove'),
+            bgRemovalMode: item.bgRemovalMode || 'skip',
             customBgImage,
             bgSettings: activeBgSettings,
             targetDimension: activeDim,
@@ -1660,8 +1661,7 @@ export default function App() {
       setAdjustments(GeminiService.getInitialAdjustments());
       setEditTargetMode('subject_only');
       setBgType('preserve');
-      const defaultRemoval = meta.hasTransparency ? 'skip' : 'remove';
-      setBgRemovalMode(defaultRemoval);
+      setBgRemovalMode('skip');
       setCustomBgImage(null);
       setCustomBgPreviewUrl(null);
       setBgSettings(DEFAULT_BG_SETTINGS);
@@ -2033,7 +2033,7 @@ export default function App() {
 
     // 8. Reset Pengaturan Background & Masking Diagnostik
     setBgType('preserve');
-    setBgRemovalMode('remove');
+    setBgRemovalMode('skip');
     setBgSettings(DEFAULT_BG_SETTINGS);
     setDetectedBgColor(undefined);
     setSegmentationWarning(null);
