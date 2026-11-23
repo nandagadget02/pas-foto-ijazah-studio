@@ -47,6 +47,7 @@ import {
   EditTargetMode,
   FaceSharpenSettings,
   FramingSettings,
+  getCategoryFramingDefaults,
   ImageMetadata,
   MaskBrushSettings,
   OutputDimension,
@@ -2561,9 +2562,15 @@ export default function App() {
                     selectedDimension={selectedDimension}
                     onSelectDimension={(newDim) => {
                       setSelectedDimension(newDim);
+                      const updatedFraming = getCategoryFramingDefaults(newDim, framingSettings);
+                      setFramingSettings(updatedFraming);
                       if (activeBatchItemId) {
                         setBatchItems((prev) =>
-                          prev.map((it) => (it.id === activeBatchItemId ? { ...it, selectedDimension: newDim } : it))
+                          prev.map((it) =>
+                            it.id === activeBatchItemId
+                              ? { ...it, selectedDimension: newDim, framingSettings: updatedFraming }
+                              : it
+                          )
                         );
                       }
                     }}

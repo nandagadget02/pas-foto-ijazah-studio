@@ -515,6 +515,24 @@ export interface OutputDimension {
   aspectRatio: number;
 }
 
+/**
+ * Menghasilkan pengaturan default garis framing berdasarkan kategori ukuran:
+ * 1. Default ON (Aktif): Pas Foto Standar Ijazah & Dokumen Resmi ('pas_foto' -> 3x4, 2x3, 3x3, 4x6)
+ * 2. Default OFF (Nonaktif): Format Cetak & Pos Card ('cetak' -> 4R, Pos Card) dan Kustom ('custom')
+ * Tetap mempertahankan pengaturan lain (lebar mm, opacity, zoom, headroom) dan mendukung penyesuaian manual.
+ */
+export function getCategoryFramingDefaults(
+  dimension?: OutputDimension | null,
+  baseFraming: FramingSettings = DEFAULT_FRAMING_SETTINGS
+): FramingSettings {
+  const isPasFoto = !dimension || dimension.category === 'pas_foto';
+  return {
+    ...baseFraming,
+    innerBorderEnabled: isPasFoto,
+    outerCutLineEnabled: isPasFoto,
+  };
+}
+
 export interface CropRect {
   x: number;
   y: number;

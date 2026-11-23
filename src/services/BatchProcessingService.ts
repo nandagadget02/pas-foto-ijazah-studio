@@ -10,6 +10,7 @@ import {
   DEFAULT_BG_SETTINGS,
   DEFAULT_FRAMING_SETTINGS,
   DEFAULT_FACE_SHARPEN_SETTINGS,
+  getCategoryFramingDefaults,
   DEFAULT_PRINTER_COMPENSATION,
   EditTargetMode,
   FaceSharpenSettings,
@@ -90,7 +91,7 @@ export class BatchProcessingService {
     const uniqueId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const targetDim = options?.selectedDimension || STANDARD_OUTPUT_DIMENSIONS[0];
-    const framing = options?.framingSettings || DEFAULT_FRAMING_SETTINGS;
+    const framing = options?.framingSettings || getCategoryFramingDefaults(targetDim, DEFAULT_FRAMING_SETTINGS);
     const baseCrop = CropEngine.getInitialCropRect(
       img.naturalWidth,
       img.naturalHeight,
@@ -212,7 +213,7 @@ export class BatchProcessingService {
     diagnosticMode?: DiagnosticPreviewMode;
   } {
     const targetDim = item.selectedDimension || options.selectedDimension;
-    const framing = item.framingSettings || options.framingSettings || DEFAULT_FRAMING_SETTINGS;
+    const framing = item.framingSettings || options.framingSettings || getCategoryFramingDefaults(targetDim, DEFAULT_FRAMING_SETTINGS);
     const baseCrop = CropEngine.getInitialCropRect(
       item.metadata.width,
       item.metadata.height,
@@ -371,7 +372,7 @@ export class BatchProcessingService {
 
       const itemDimension = item.selectedDimension || targetDimension;
       const itemDimSlug = `${itemDimension.widthCm}x${itemDimension.heightCm}cm`.replace('.', '_');
-      const framing = item.framingSettings || options.framingSettings || DEFAULT_FRAMING_SETTINGS;
+      const framing = item.framingSettings || options.framingSettings || getCategoryFramingDefaults(itemDimension, DEFAULT_FRAMING_SETTINGS);
 
       // Generate 100% full-resolution 600 DPI directly from sourceImage with precise framing crop
       const baseCrop = CropEngine.getInitialCropRect(

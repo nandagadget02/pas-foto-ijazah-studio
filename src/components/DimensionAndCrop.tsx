@@ -24,6 +24,7 @@ import {
   ImageMetadata,
   FramingSettings,
   DEFAULT_FRAMING_SETTINGS,
+  getCategoryFramingDefaults,
 } from '../types/analysis';
 import {
   STANDARD_OUTPUT_DIMENSIONS,
@@ -80,6 +81,10 @@ export const DimensionAndCrop: React.FC<DimensionAndCropProps> = ({
         customHeight,
         customDpi
       );
+      // Ukuran kustom bukan kategori Pas Foto Standar Ijazah -> default OFF (dapat diaktifkan manual)
+      if (onChangeFramingSettings) {
+        onChangeFramingSettings(getCategoryFramingDefaults(customDim, framingSettings));
+      }
       onSelectDimension(customDim);
 
       if (imageMetadata) {
@@ -117,6 +122,12 @@ export const DimensionAndCrop: React.FC<DimensionAndCropProps> = ({
   };
 
   const handleSelectPreset = (dim: OutputDimension) => {
+    // Sesuaikan status default garis framing berdasarkan kategori ukuran:
+    // Default ON (Aktif) HANYA untuk Pas Foto Standar Ijazah & Dokumen Resmi ('pas_foto')
+    // Default OFF (Nonaktif) untuk Format Cetak & Pos Card ('cetak')
+    if (onChangeFramingSettings) {
+      onChangeFramingSettings(getCategoryFramingDefaults(dim, framingSettings));
+    }
     onSelectDimension(dim);
     if (imageMetadata) {
       const newCrop = CropEngine.getInitialCropRect(
