@@ -452,7 +452,7 @@ export class ImageProcessor {
         // B. Garis Hitam (Outer Cutting Line)
         if (framingSettings.outerCutLineEnabled && framingSettings.outerCutLineWidthMm > 0) {
           const cutLineWidthPx = Math.max(1, Math.round(framingSettings.outerCutLineWidthMm * pxPerMm));
-          const opacity = Math.max(0, Math.min(1, (framingSettings.outerCutLineOpacity ?? 100) / 100));
+          const opacity = Math.max(0, Math.min(1, (framingSettings.outerCutLineOpacity ?? 50) / 100));
           targetCtx.save();
           targetCtx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
           targetCtx.lineWidth = cutLineWidthPx;

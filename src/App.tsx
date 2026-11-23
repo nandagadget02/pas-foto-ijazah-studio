@@ -126,7 +126,7 @@ export default function App() {
   }, [geminiAnalysisResult, localAnalysisResult]);
 
   // 3. Target Mode & Tone
-  const [photoMode, setPhotoMode] = useState<PhotoMode>('bw'); // Default B&W / GRAYSCALE
+  const [photoMode, setPhotoMode] = useState<PhotoMode>('color'); // Default FOTO BERWARNA (Color)
   const [targetTone, setTargetTone] = useState<TargetTone>('natural'); // Default Natural / Ijazah
 
   // 4. Adjustments State
@@ -2010,6 +2010,7 @@ export default function App() {
     setPrintCanvas(null);
 
     // 6. Reset Seluruh Parameter Penyesuaian & Tonal ke Nilai Bawaan
+    setPhotoMode('color');
     setAdjustments(GeminiService.getInitialAdjustments());
     setPreviousAdjustments(null);
     setTargetTone('natural');

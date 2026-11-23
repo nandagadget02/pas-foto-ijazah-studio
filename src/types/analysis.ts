@@ -204,7 +204,7 @@ export interface FramingSettings {
   // 2. Garis Hitam (Outer Cutting Line)
   outerCutLineEnabled: boolean;
   outerCutLineWidthMm: number; // mm (default: 0.04)
-  outerCutLineOpacity: number; // 0 - 100% (default: 100)
+  outerCutLineOpacity: number; // 0 - 100% (default: 50)
 
   // 3. Skala Zoom Wajah (Face-Centric Framing)
   faceZoomEnabled: boolean;
@@ -223,7 +223,7 @@ export const DEFAULT_FRAMING_SETTINGS: FramingSettings = {
   innerBorderWidthMm: 1.0,
   outerCutLineEnabled: true,
   outerCutLineWidthMm: 0.01,
-  outerCutLineOpacity: 100,
+  outerCutLineOpacity: 50,
   faceZoomEnabled: true,
   faceZoomPercent: 36,
   headroomEnabled: true,
@@ -233,14 +233,14 @@ export const DEFAULT_FRAMING_SETTINGS: FramingSettings = {
 
 export interface FaceSharpenSettings {
   enabled: boolean;
-  intensity: number; // 10 to 100%, default 40%
+  intensity: number; // 10 to 100%, default 80% (Maksimal)
   radius: number; // 0.6 to 2.5 px, default 1.2 px
   threshold: number; // 1 to 15 levels, default 4
 }
 
 export const DEFAULT_FACE_SHARPEN_SETTINGS: FaceSharpenSettings = {
   enabled: true,
-  intensity: 40,
+  intensity: 80,
   radius: 1.2,
   threshold: 4,
 };

@@ -606,7 +606,7 @@ export const DimensionAndCrop: React.FC<DimensionAndCropProps> = ({
                   handleUpdateOuterCutLine(
                     true,
                     framingSettings.outerCutLineWidthMm,
-                    parseInt(e.target.value, 10) || 100
+                    parseInt(e.target.value, 10) || 50
                   )
                 }
                 className={`w-full accent-amber-400 cursor-pointer ${
